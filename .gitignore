@@ -42,8 +42,6 @@ pnpm-debug.log*
 *.njsproj
 *.sln
 *.sw?
-.DS_Store
-Thumbs.db
 
 # ─── Database & Cache ─────────────────────────────────
 *.db
@@ -52,17 +50,39 @@ project/backend/cache/
 project/backend/__pycache__/
 project/backend/attentiveness/__pycache__/
 
-# ─── Model Weights ─────────────────────────────────────
+# ─── AI / ML Model Weights (large) ────────────────────
 *.pt
 *.pth
 *.onnx
 *.h5
+*.hdf5
+*.pb
+*.tflite
+*.safetensors
+*.bin
+*.pkl
+*.pickle
+*.joblib
+*.caffemodel
+*.params
+*.weight
+*.weights
+*.engine
+*.plan
+*.mar
+*.torchscript
+
+# ─── Student Image Dataset (large) ────────────────────
+project/SI1/
 
 # ─── Video Files (large) ──────────────────────────────
 *.mp4
 *.avi
 *.mov
 *.mkv
+*.wmv
+*.flv
+*.webm
 
 # ─── Output / Generated ───────────────────────────────
 project/Output/

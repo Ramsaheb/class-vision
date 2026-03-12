@@ -272,7 +272,7 @@ const Help: React.FC = () => {
           </div>
           <div className="flex space-x-3">
             <a
-              href="https://github.com"
+              href="https://github.com/Ramsaheb/ai-powered-classroom-monitoring-system-"
               target="_blank"
               rel="noopener noreferrer"
               className="flex items-center space-x-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors text-sm"
@@ -281,7 +281,7 @@ const Help: React.FC = () => {
               <span>GitHub</span>
             </a>
             <a
-              href="mailto:support@example.com"
+              href="mailto:ramsahebprasad1234@gmail.com"
               className="flex items-center space-x-2 px-4 py-2 bg-white/20 hover:bg-white/30 rounded-lg transition-colors text-sm"
             >
               <Mail className="w-4 h-4" />
