@@ -37,6 +37,9 @@ except ImportError as e:
     print(f"⚠️ Database not available: {e}")
     print("📝 Running without persistent storage")
 
+# Path for frontend static data snapshots
+FRONTEND_DATA_DIR = os.path.join(PROJECT_ROOT, 'frontend', 'public', 'data')
+
 app = FastAPI(title="CORIS Attendance Backend", version="1.0.0")
 
 # CORS for local dev UI
@@ -138,6 +141,13 @@ async def startup_event():
         
         # Use the basic pipeline (which was working fine)
         asyncio.create_task(process_attendance_async(default_request))
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    """Export a final data snapshot when the backend stops so the frontend keeps working."""
+    print("🛑 Server shutting down — exporting final data snapshot...")
+    export_data_snapshot(app_state.last_result)
+    print("✅ Shutdown snapshot complete.")
 
 @app.get("/health")
 def health():
@@ -264,6 +274,9 @@ async def process_attendance_async(req: RunRequest):
         app_state.last_result = enhanced_result
         save_result_to_file(enhanced_result)
         
+        # Export data snapshot for offline frontend
+        export_data_snapshot(enhanced_result)
+        
         # Broadcast completion
         await app_state.broadcast_status({
             "is_processing": False, 
@@ -331,11 +344,11 @@ async def process_enhanced_attendance_async(req: EnhancedRunRequest):
         attention_output = f"attention_results_{timestamp}.json"
         session_name = f"Enhanced_Session_{timestamp}"
         
-        # Process video
+        # Process video (save_results=False to skip CSV/JSON file generation; DB save is separate)
         result = pipeline.process_video(
             video_path=req.video_path or DEFAULT_VIDEO_PATH,
             output_video_path=req.output_video,
-            save_results=True,
+            save_results=False,
             output_csv=output_csv,
             attention_output=attention_output,
             session_name=session_name
@@ -353,6 +366,9 @@ async def process_enhanced_attendance_async(req: EnhancedRunRequest):
         # Cache result
         app_state.last_result = enhanced_result
         save_result_to_file(enhanced_result, "enhanced_last_result.json")
+        
+        # Export data snapshot for offline frontend
+        export_data_snapshot(enhanced_result)
         
         await app_state.broadcast_status({
             "is_processing": False, 
@@ -508,6 +524,9 @@ async def save_basic_results_to_database(enhanced_result: Dict[str, Any], req: R
         # Complete the session
         db.complete_session(session_id)
         
+        # Update student statistics (total_sessions, total_present, last_seen)
+        db.update_student_stats()
+        
         # Cache dashboard analytics
         dashboard_data = db.get_dashboard_data()
         db.cache_analytics('dashboard_data', dashboard_data)
@@ -599,6 +618,78 @@ def get_color_for_name(name: str) -> str:
     if name == "Unknown":
         return "#6B7280"
     return colors[hash(name) % len(colors)]
+
+def export_data_snapshot(last_result: Dict[str, Any] = None):
+    """Export all key API data as static JSON files so the frontend works offline.
+    
+    Writes to frontend/public/data/ which Vite serves at /data/*.json.
+    This covers every endpoint the frontend uses so it can run fully without the backend.
+    """
+    try:
+        os.makedirs(FRONTEND_DATA_DIR, exist_ok=True)
+
+        if DATABASE_AVAILABLE:
+            # 1. Student insights (used by Dashboard, Students, Defaulters)
+            insights = db.get_all_student_insights()
+            _write_snapshot('student-insights.json', {"data": insights})
+
+            # 2. Sessions list
+            _write_snapshot('sessions.json', {"sessions": insights.get('sessions', [])})
+
+            # 3. Per-session detail (used by Sessions page drill-down)
+            for session in insights.get('sessions', []):
+                sid = session.get('id')
+                if sid is not None:
+                    try:
+                        detail = db.get_session_details(sid)
+                        _write_snapshot(f'session-{sid}.json', detail)
+                    except Exception:
+                        pass
+
+            # 4. Per-student history (used by Students page drill-down)
+            for student in insights.get('students', []):
+                name = student.get('name', '')
+                if name:
+                    try:
+                        history = db.get_student_session_history(name)
+                        _write_snapshot(f'student-history-{name}.json', {"data": history})
+                    except Exception:
+                        pass
+
+            # 5. Dashboard data
+            try:
+                dashboard = db.get_dashboard_data()
+                _write_snapshot('dashboard-data.json', {"data": dashboard, "cached": False})
+            except Exception:
+                pass
+
+        # 6. Last result (used by LiveAnalytics)
+        if last_result:
+            _write_snapshot('last-result.json', last_result)
+
+        # 7. Gallery info
+        gallery_path = DEFAULT_GALLERY_DIR
+        if os.path.exists(gallery_path):
+            people = []
+            for person_dir in os.listdir(gallery_path):
+                person_path = os.path.join(gallery_path, person_dir)
+                if os.path.isdir(person_path):
+                    image_count = len([f for f in os.listdir(person_path)
+                                       if f.lower().endswith(('.jpg', '.jpeg', '.png', '.bmp'))])
+                    people.append({"name": person_dir, "image_count": image_count})
+            _write_snapshot('gallery-info.json', {"gallery_path": gallery_path, "people": people})
+
+        print("📦 Data snapshot exported for offline frontend")
+    except Exception as e:
+        print(f"⚠️ Data snapshot export failed: {e}")
+
+
+def _write_snapshot(filename: str, data: Any):
+    """Write a single snapshot JSON file."""
+    path = os.path.join(FRONTEND_DATA_DIR, filename)
+    with open(path, 'w', encoding='utf-8') as f:
+        json.dump(data, f, ensure_ascii=False, indent=2, default=str)
+
 
 def save_result_to_file(result: Dict[str, Any], filename: str = 'last_result.json'):
     """Save result to JSON file for persistence"""

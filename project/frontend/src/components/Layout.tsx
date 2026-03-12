@@ -4,7 +4,7 @@ import { useTheme } from '../contexts/ThemeContext';
 import {
   LayoutDashboard, Activity, HelpCircle, Menu, X, Eye, Sun, Moon,
   Users, History, AlertTriangle, PanelLeftClose, PanelLeftOpen,
-  Bell, Search, ChevronRight, Sparkles, Database,
+  ChevronRight, Sparkles, Database,
 } from 'lucide-react';
 
 interface LayoutProps {
@@ -179,19 +179,6 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
           </div>
 
           <div className="flex items-center gap-2">
-            {/* Quick search - visual only */}
-            <div className="hidden md:flex items-center gap-2 px-3 py-2 bg-gray-50 dark:bg-gray-800/60 rounded-xl text-gray-400 dark:text-gray-500 text-sm cursor-default border border-gray-100 dark:border-gray-700/50">
-              <Search className="w-4 h-4" />
-              <span className="text-xs">Search...</span>
-              <kbd className="hidden lg:inline-flex px-1.5 py-0.5 bg-gray-200 dark:bg-gray-700 rounded text-[10px] font-mono text-gray-500 dark:text-gray-400">⌘K</kbd>
-            </div>
-
-            {/* Notifications */}
-            <button className="relative p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors" title="Notifications">
-              <Bell className="w-[18px] h-[18px] text-gray-500 dark:text-gray-400" />
-              <span className="absolute top-1.5 right-1.5 w-2 h-2 rounded-full bg-red-500 ring-2 ring-white dark:ring-gray-900" />
-            </button>
-
             {/* Theme toggle */}
             <button
               onClick={toggleTheme}

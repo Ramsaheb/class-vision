@@ -90,20 +90,29 @@ const Sessions: React.FC = () => {
     if (!confirm('Delete this session? This cannot be undone.')) return;
     setDeleting(id);
     try {
-      await fetch(API + '/session/' + id, { method: 'DELETE' });
-      setSessions(s => s.filter(x => x.id !== id));
+      const res = await fetch(API + '/session/' + id, { method: 'DELETE' });
+      if (!res.ok) throw new Error('Delete failed');
+      setSessions(s => {
+        const updated = s.filter(x => x.id !== id);
+        // Update localStorage cache so deleted session doesn't reappear
+        try { localStorage.setItem('coris_cache__sessions', JSON.stringify({ data: { sessions: updated }, ts: Date.now() })); } catch {}
+        return updated;
+      });
       if (selected && selected.id === id) setSelected(null);
-    } catch { /* ignore */ } finally { setDeleting(null); }
+    } catch { alert('Failed to delete session. Is the backend running?'); } finally { setDeleting(null); }
   };
 
   const deleteAllSessions = async () => {
     if (!confirm('Delete ALL sessions? This will permanently remove all session data and cannot be undone.')) return;
     setDeletingAll(true);
     try {
-      await fetch(API + '/sessions/all', { method: 'DELETE' });
+      const res = await fetch(API + '/sessions/all', { method: 'DELETE' });
+      if (!res.ok) throw new Error('Delete failed');
       setSessions([]);
       setSelected(null);
-    } catch { /* ignore */ } finally { setDeletingAll(false); }
+      // Clear cached sessions
+      try { localStorage.setItem('coris_cache__sessions', JSON.stringify({ data: { sessions: [] }, ts: Date.now() })); } catch {}
+    } catch { alert('Failed to delete sessions. Is the backend running?'); } finally { setDeletingAll(false); }
   };
 
   const handleSort = (key: SortKey) => {

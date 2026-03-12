@@ -281,7 +281,7 @@ const Defaulters: React.FC = () => {
                     <div className="flex items-center gap-4 mt-1.5 text-xs text-gray-500 dark:text-gray-400">
                       <span>Present: <span className="font-semibold text-gray-600 dark:text-gray-300">{s.total_present}/{s.total_sessions}</span></span>
                       <span>Absent: <span className="font-semibold text-red-500">{absent}</span></span>
-                      <span>Attention: <span className="font-semibold text-gray-600 dark:text-gray-300">{(s.avg_attention_score * 100).toFixed(0)}%</span></span>
+                      <span>Attention: <span className="font-semibold text-gray-600 dark:text-gray-300">{s.avg_attention_score > 0 ? (s.avg_attention_score * 100).toFixed(0) + '%' : '--'}</span></span>
                       <span>Last: <span className="font-medium">{s.last_seen ? new Date(s.last_seen).toLocaleDateString() : 'Never'}</span></span>
                     </div>
                   </div>

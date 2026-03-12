@@ -21,10 +21,47 @@ function loadFromCache<T = unknown>(endpoint: string): T | null {
   } catch { return null; }
 }
 
+// ─── Static Snapshot Fallback ─────────────────────────────────
+// Maps API endpoint keys to static JSON files exported by the backend.
+const SNAPSHOT_MAP: Record<string, string> = {
+  '/student-insights': '/data/student-insights.json',
+  '/sessions': '/data/sessions.json',
+  '/last-result': '/data/last-result.json',
+  '/gallery-info': '/data/gallery-info.json',
+  '/dashboard-data': '/data/dashboard-data.json',
+};
+
+// Dynamic routes: /session/{id} → /data/session-{id}.json  etc.
+function resolveSnapshotFile(key: string): string | null {
+  // Exact match first
+  if (SNAPSHOT_MAP[key]) return SNAPSHOT_MAP[key];
+  // /session/5 → /data/session-5.json
+  const sessionMatch = key.match(/^\/session\/(\d+)$/);
+  if (sessionMatch) return `/data/session-${sessionMatch[1]}.json`;
+  // /student-history/Name → /data/student-history-Name.json
+  const historyMatch = key.match(/^\/student-history\/(.+)$/);
+  if (historyMatch) return `/data/student-history-${decodeURIComponent(historyMatch[1])}.json`;
+  return null;
+}
+
+async function loadFromSnapshot<T>(key: string): Promise<T | null> {
+  const file = resolveSnapshotFile(key);
+  if (!file) return null;
+  try {
+    const res = await fetch(file);
+    if (!res.ok) return null;
+    const data = (await res.json()) as T;
+    // Seed localStorage so future loads are instant
+    saveToCache(key, data);
+    return data;
+  } catch { return null; }
+}
+
 /**
- * Fetch with automatic localStorage caching.
- * On success → caches the response.
- * On failure → returns cached data (offline fallback).
+ * Fetch with automatic localStorage caching + static snapshot fallback.
+ * 1. Try live API
+ * 2. Fall back to localStorage cache
+ * 3. Fall back to static /data/*.json snapshot (exported after each backend run)
  * Returns { data, offline } so pages can show a banner.
  */
 export async function cachedFetch<T = unknown>(
@@ -41,8 +78,12 @@ export async function cachedFetch<T = unknown>(
     saveToCache(key, data);
     return { data, offline: false };
   } catch {
+    // Tier 2: localStorage
     const cached = loadFromCache<T>(key);
-    return { data: cached, offline: true };
+    if (cached) return { data: cached, offline: true };
+    // Tier 3: static snapshot file
+    const snapshot = await loadFromSnapshot<T>(key);
+    return { data: snapshot, offline: true };
   }
 }
 

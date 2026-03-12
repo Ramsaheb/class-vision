@@ -66,6 +66,7 @@ const LiveAnalytics: React.FC = () => {
     a.href = URL.createObjectURL(blob);
     a.download = 'attendance_' + new Date().toISOString().slice(0, 10) + '.csv';
     a.click();
+    URL.revokeObjectURL(a.href);
   };
 
   const att = lastResult?.attendance || {};

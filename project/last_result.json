@@ -1813,7 +1813,7 @@
     "gallery_size_mb": 0.028260231018066406,
     "gallery_people_count": 7
   },
-  "timestamp": "2026-03-12T18:57:37.224324",
+  "timestamp": "2026-03-12T20:03:37.770941",
   "summary": {
     "total_people": 6,
     "present_people": 6,
@@ -1824,12 +1824,12 @@
     {
       "name": "Harsh",
       "value": 423,
-      "color": "#6B7280"
+      "color": "#8B5A5A"
     },
     {
       "name": "Harshit",
       "value": 1159,
-      "color": "#EC4899"
+      "color": "#F59E0B"
     },
     {
       "name": "Unknown",
@@ -1839,22 +1839,22 @@
     {
       "name": "Rajendra",
       "value": 1236,
-      "color": "#EF4444"
+      "color": "#3B82F6"
     },
     {
       "name": "Harshal",
       "value": 1193,
-      "color": "#EC4899"
+      "color": "#10B981"
     },
     {
       "name": "Vishal",
       "value": 1236,
-      "color": "#EF4444"
+      "color": "#6B7280"
     },
     {
       "name": "Krish",
       "value": 666,
-      "color": "#EC4899"
+      "color": "#8B5CF6"
     }
   ],
   "unknown_reasons_chart": [

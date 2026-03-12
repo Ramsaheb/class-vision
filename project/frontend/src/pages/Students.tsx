@@ -109,7 +109,8 @@ const Students: React.FC = () => {
 
   const defaulterCount = students.filter(s => s.total_sessions > 0 && s.attendance_rate < DEFAULTER_THRESHOLD).length;
   const avgAttendance = students.length > 0 ? students.reduce((s, st) => s + st.attendance_rate, 0) / students.length : 0;
-  const avgAttention = students.length > 0 ? students.reduce((s, st) => s + st.avg_attention_score, 0) / students.length : 0;
+  const studentsWithAttn = students.filter(s => s.avg_attention_score > 0);
+  const avgAttention = studentsWithAttn.length > 0 ? studentsWithAttn.reduce((s, st) => s + st.avg_attention_score, 0) / studentsWithAttn.length : -1;
 
   const attendanceDist = useMemo(() => {
     const bins = [
@@ -177,7 +178,7 @@ const Students: React.FC = () => {
         {[
           { label: 'Total Students', value: String(students.length), icon: GraduationCap, gradient: 'from-violet-500 to-purple-600' },
           { label: 'Avg Attendance', value: avgAttendance.toFixed(1) + '%', icon: TrendingUp, gradient: 'from-emerald-500 to-teal-600' },
-          { label: 'Avg Attention', value: (avgAttention * 100).toFixed(1) + '%', icon: Eye, gradient: 'from-blue-500 to-cyan-600' },
+          { label: 'Avg Attention', value: avgAttention >= 0 ? (avgAttention * 100).toFixed(1) + '%' : '--', icon: Eye, gradient: 'from-blue-500 to-cyan-600' },
           { label: 'Defaulters', value: String(defaulterCount), icon: AlertTriangle, gradient: 'from-red-500 to-rose-600' },
         ].map((c) => (
           <div key={c.label} className="kpi-card">
@@ -292,7 +293,7 @@ const Students: React.FC = () => {
                       </div>
                     </td>
                     <td className="px-5 py-3.5">
-                      <span className={'font-semibold text-xs ' + rateColor(s.avg_attention_score * 100)}>{(s.avg_attention_score * 100).toFixed(0)}%</span>
+                      <span className={'font-semibold text-xs ' + (s.avg_attention_score > 0 ? rateColor(s.avg_attention_score * 100) : 'text-gray-400 dark:text-gray-500')}>{s.avg_attention_score > 0 ? (s.avg_attention_score * 100).toFixed(0) + '%' : '--'}</span>
                     </td>
                     <td className="px-5 py-3.5 text-gray-600 dark:text-gray-300 font-medium">{s.total_present}/{s.total_sessions}</td>
                     <td className="px-5 py-3.5 text-gray-500 dark:text-gray-400">{s.avg_presence_time.toFixed(1)}s</td>
