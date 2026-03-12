@@ -1,5 +1,52 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 
+// ─── Local Storage Cache Helpers ──────────────────────────────
+const CACHE_PREFIX = 'coris_cache_';
+
+function cacheKey(endpoint: string): string {
+  return CACHE_PREFIX + endpoint.replace(/[^a-zA-Z0-9_-]/g, '_');
+}
+
+function saveToCache(endpoint: string, data: unknown): void {
+  try {
+    localStorage.setItem(cacheKey(endpoint), JSON.stringify({ data, ts: Date.now() }));
+  } catch { /* quota exceeded – ignore */ }
+}
+
+function loadFromCache<T = unknown>(endpoint: string): T | null {
+  try {
+    const raw = localStorage.getItem(cacheKey(endpoint));
+    if (!raw) return null;
+    return (JSON.parse(raw) as { data: T }).data;
+  } catch { return null; }
+}
+
+/**
+ * Fetch with automatic localStorage caching.
+ * On success → caches the response.
+ * On failure → returns cached data (offline fallback).
+ * Returns { data, offline } so pages can show a banner.
+ */
+export async function cachedFetch<T = unknown>(
+  url: string,
+  endpoint?: string,
+): Promise<{ data: T | null; offline: boolean }> {
+  let key: string;
+  try { key = endpoint || new URL(url).pathname; }
+  catch { key = endpoint || url.replace(/^https?:\/\/[^/]+/, ''); }
+  try {
+    const res = await fetch(url);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = (await res.json()) as T;
+    saveToCache(key, data);
+    return { data, offline: false };
+  } catch {
+    const cached = loadFromCache<T>(key);
+    return { data: cached, offline: true };
+  }
+}
+
+// ─── Interfaces ───────────────────────────────────────────────
 export interface ProcessingStatus {
   is_processing: boolean;
   progress: number;
@@ -48,7 +95,10 @@ export const useWebSocket = (url: string) => {
     progress: 0,
     message: 'Ready'
   });
-  const [result, setResult] = useState<AttendanceResult | null>(null);
+  const [result, setResult] = useState<AttendanceResult | null>(() => {
+    // Load cached result on init (offline support)
+    return loadFromCache<AttendanceResult>('ws_result');
+  });
   const [isConnected, setIsConnected] = useState(false);
   const wsRef = useRef<WebSocket | null>(null);
   const reconnectTimeoutRef = useRef<number>();
@@ -71,6 +121,8 @@ export const useWebSocket = (url: string) => {
             setStatus(message.data);
           } else if (message.type === 'result_update') {
             setResult(message.data);
+            // Cache result for offline access
+            saveToCache('ws_result', message.data);
           }
         } catch (error) {
           console.error('Error parsing WebSocket message:', error);
@@ -380,6 +432,32 @@ export const useApi = (baseUrl: string) => {
     }
   }, [baseUrl]);
 
+  const deleteSession = useCallback(async (sessionId: number) => {
+    try {
+      const response = await fetch(`${baseUrl}/session/${sessionId}`, { method: 'DELETE' });
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('Error deleting session:', error);
+      throw error;
+    }
+  }, [baseUrl]);
+
+  const deleteAllSessions = useCallback(async () => {
+    try {
+      const response = await fetch(`${baseUrl}/sessions/all`, { method: 'DELETE' });
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+      return await response.json();
+    } catch (error) {
+      console.error('Error deleting all sessions:', error);
+      throw error;
+    }
+  }, [baseUrl]);
+
   return {
     startProcessing,
     getLastResult,
@@ -397,6 +475,8 @@ export const useApi = (baseUrl: string) => {
     startEnhancedProcessing,
     getEnhancedResults,
     getStudentInsights,
-    getStudentHistory
+    getStudentHistory,
+    deleteSession,
+    deleteAllSessions,
   };
 };

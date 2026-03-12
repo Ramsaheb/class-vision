@@ -3,7 +3,7 @@ import {
   HelpCircle, Book, Video, Mail, MessageSquare, ExternalLink, 
   Users, Activity, Play, Monitor, Download, Zap, 
   CheckCircle, AlertTriangle, Info, ChevronRight, Terminal,
-  Folder, Image, Clock, Eye
+  Folder, Image, Clock, Eye, Sparkles,
 } from 'lucide-react';
 
 const Help: React.FC = () => {
@@ -45,228 +45,118 @@ const Help: React.FC = () => {
   ];
 
   const troubleshootItems = [
-    {
-      icon: AlertTriangle,
-      issue: 'Backend not connecting',
-      solution: 'Ensure the backend server is running on port 8000. Run "cd backend && uvicorn server:app --reload" in terminal.',
-      severity: 'warning'
-    },
-    {
-      icon: Users,
-      issue: 'Students showing as "Unknown"',
-      solution: 'Add more reference images (5-10 per student) with varied angles and lighting. Ensure images are clear and show the full face.',
-      severity: 'info'
-    },
-    {
-      icon: Video,
-      issue: 'Video not processing',
-      solution: 'Check that input.mp4 exists in the project root. Ensure the video codec is compatible (H.264 recommended).',
-      severity: 'warning'
-    },
-    {
-      icon: Monitor,
-      issue: 'Live feed showing black screen',
-      solution: 'Wait for processing to complete. The video stream shows the annotated output after processing finishes.',
-      severity: 'info'
-    },
-    {
-      icon: Clock,
-      issue: 'Processing stuck at 95%',
-      solution: 'This is normal - the final phase involves saving results. Wait 10-15 seconds for completion.',
-      severity: 'info'
-    },
-    {
-      icon: Download,
-      issue: 'Cannot export data',
-      solution: 'Ensure processing has completed at least once. Check browser console for any API errors.',
-      severity: 'warning'
-    }
+    { icon: AlertTriangle, issue: 'Backend not connecting', solution: 'Ensure the backend server is running on port 8000. Run "cd backend && uvicorn server:app --reload" in terminal.', severity: 'warning' },
+    { icon: Users, issue: 'Students showing as "Unknown"', solution: 'Add more reference images (5-10 per student) with varied angles and lighting. Ensure images are clear and show the full face.', severity: 'info' },
+    { icon: Video, issue: 'Video not processing', solution: 'Check that input.mp4 exists in the project root. Ensure the video codec is compatible (H.264 recommended).', severity: 'warning' },
+    { icon: Monitor, issue: 'Live feed showing black screen', solution: 'Wait for processing to complete. The video stream shows the annotated output after processing finishes.', severity: 'info' },
+    { icon: Clock, issue: 'Processing stuck at 95%', solution: 'This is normal - the final phase involves saving results. Wait 10-15 seconds for completion.', severity: 'info' },
+    { icon: Download, issue: 'Cannot export data', solution: 'Ensure processing has completed at least once. Check browser console for any API errors.', severity: 'warning' },
   ];
 
   const features = [
-    {
-      icon: Eye,
-      title: 'Face Recognition',
-      description: 'Multi-model AI pipeline with YOLO, MTCNN & FaceNet for 99%+ accuracy',
-      color: 'blue'
-    },
-    {
-      icon: Activity,
-      title: 'Real-time Tracking',
-      description: 'Live progress updates via WebSocket with frame-by-frame detection',
-      color: 'green'
-    },
-    {
-      icon: Zap,
-      title: 'Smart Caching',
-      description: 'Gallery embeddings cached for faster subsequent processing',
-      color: 'yellow'
-    },
-    {
-      icon: Download,
-      title: 'Export Results',
-      description: 'Download attendance data and processed video with annotations',
-      color: 'purple'
-    }
+    { icon: Eye, title: 'Face Recognition', description: 'Multi-model AI pipeline with YOLO, MTCNN & FaceNet for 99%+ accuracy', gradient: 'from-blue-500 to-cyan-600' },
+    { icon: Activity, title: 'Real-time Tracking', description: 'Live progress updates via WebSocket with frame-by-frame detection', gradient: 'from-emerald-500 to-teal-600' },
+    { icon: Zap, title: 'Smart Caching', description: 'Gallery embeddings cached for faster subsequent processing', gradient: 'from-amber-500 to-orange-600' },
+    { icon: Download, title: 'Export Results', description: 'Download attendance data and processed video with annotations', gradient: 'from-violet-500 to-purple-600' },
   ];
 
-  const colorClasses: Record<string, string> = {
-    blue: 'bg-blue-100 dark:bg-blue-900/30 text-blue-600 dark:text-blue-400',
-    green: 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400',
-    yellow: 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-600 dark:text-yellow-400',
-    purple: 'bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400'
-  };
-
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 animate-fade-in">
       {/* Header */}
-      <div className="bg-card-light dark:bg-card-dark rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
+      <div className="glass-card p-6">
         <div className="flex items-center justify-between">
           <div className="flex items-center space-x-4">
-            <div className="p-3 rounded-lg bg-purple-100 dark:bg-purple-900/30">
-              <HelpCircle className="w-8 h-8 text-purple-600 dark:text-purple-400" />
+            <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg">
+              <HelpCircle className="w-7 h-7 text-white" />
             </div>
             <div>
-              <h1 className="text-2xl font-bold text-gray-900 dark:text-white">CORIS Help Center</h1>
-              <p className="text-gray-600 dark:text-gray-300">Classroom Observation & Recognition Intelligence System</p>
+              <h1 className="text-2xl font-extrabold text-gray-900 dark:text-white">CORIS Help Center</h1>
+              <p className="text-sm text-gray-500 dark:text-gray-400">Classroom Observation & Recognition Intelligence System</p>
             </div>
           </div>
-          <div className="hidden md:flex items-center space-x-2 text-sm text-gray-500 dark:text-gray-400">
-            <span className="px-2 py-1 bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded-full text-xs font-medium">
-              v1.0.0
-            </span>
-          </div>
+          <span className="status-present text-xs font-bold">v1.0.0</span>
         </div>
       </div>
 
       {/* Tab Navigation */}
-      <div className="bg-card-light dark:bg-card-dark rounded-xl shadow-sm border border-gray-200 dark:border-gray-700">
-        <div className="flex border-b border-gray-200 dark:border-gray-700">
-          <button
-            onClick={() => setActiveTab('quickstart')}
-            className={`flex-1 px-6 py-4 text-sm font-medium transition-colors ${
-              activeTab === 'quickstart'
-                ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400 bg-blue-50 dark:bg-blue-900/10'
-                : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
-            }`}
-          >
-            <Book className="w-4 h-4 inline mr-2" />
-            Quick Start
-          </button>
-          <button
-            onClick={() => setActiveTab('faq')}
-            className={`flex-1 px-6 py-4 text-sm font-medium transition-colors ${
-              activeTab === 'faq'
-                ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400 bg-blue-50 dark:bg-blue-900/10'
-                : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
-            }`}
-          >
-            <MessageSquare className="w-4 h-4 inline mr-2" />
-            FAQ
-          </button>
-          <button
-            onClick={() => setActiveTab('troubleshoot')}
-            className={`flex-1 px-6 py-4 text-sm font-medium transition-colors ${
-              activeTab === 'troubleshoot'
-                ? 'text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400 bg-blue-50 dark:bg-blue-900/10'
-                : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
-            }`}
-          >
-            <AlertTriangle className="w-4 h-4 inline mr-2" />
-            Troubleshooting
-          </button>
+      <div className="glass-card overflow-hidden">
+        <div className="flex border-b border-gray-100 dark:border-gray-800">
+          {[
+            { key: 'quickstart' as const, label: 'Quick Start', icon: Book },
+            { key: 'faq' as const, label: 'FAQ', icon: MessageSquare },
+            { key: 'troubleshoot' as const, label: 'Troubleshooting', icon: AlertTriangle },
+          ].map(tab => (
+            <button
+              key={tab.key}
+              onClick={() => setActiveTab(tab.key)}
+              className={`flex-1 px-6 py-4 text-sm font-semibold transition-all flex items-center justify-center gap-2 ${
+                activeTab === tab.key
+                  ? 'text-primary-600 dark:text-primary-400 border-b-2 border-primary-500 bg-primary-50/50 dark:bg-primary-900/10'
+                  : 'text-gray-500 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white hover:bg-gray-50 dark:hover:bg-gray-800/50'
+              }`}
+            >
+              <tab.icon className="w-4 h-4" />
+              {tab.label}
+            </button>
+          ))}
         </div>
 
         {/* Quick Start Content */}
         {activeTab === 'quickstart' && (
           <div className="p-6 space-y-6">
-            {/* Steps */}
             <div className="space-y-4">
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white flex items-center">
-                <Play className="w-5 h-5 mr-2 text-green-500" />
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-emerald-400 to-teal-500 flex items-center justify-center">
+                  <Play className="w-4 h-4 text-white" />
+                </div>
                 Getting Started in 4 Steps
               </h3>
               
               <div className="grid gap-4">
-                <div className="flex items-start space-x-4 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
-                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold">1</div>
-                  <div className="flex-1">
-                    <h4 className="font-medium text-gray-900 dark:text-white flex items-center">
-                      <Folder className="w-4 h-4 mr-2 text-blue-500" />
-                      Setup Student Gallery
-                    </h4>
-                    <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
-                      Create folders in <code className="bg-gray-200 dark:bg-gray-700 px-2 py-0.5 rounded text-xs">SI1/</code> with student names. Add 5-10 clear face photos per student.
-                    </p>
-                    <div className="mt-2 text-xs text-gray-500 dark:text-gray-400 font-mono bg-gray-100 dark:bg-gray-700 p-2 rounded">
-                      SI1/<br/>
-                      ├── Harsh/ (9 images)<br/>
-                      ├── Harshal/ (8 images)<br/>
-                      └── Vishal/ (9 images)
+                {[
+                  { step: 1, icon: Folder, color: 'from-blue-500 to-cyan-600', title: 'Setup Student Gallery', desc: 'Create folders in SI1/ with student names. Add 5-10 clear face photos per student.', code: 'SI1/\n├── Harsh/ (9 images)\n├── Harshal/ (8 images)\n└── Vishal/ (9 images)' },
+                  { step: 2, icon: Video, color: 'from-violet-500 to-purple-600', title: 'Add Input Video', desc: 'Place your classroom video as input.mp4 in the project root directory.' },
+                  { step: 3, icon: Terminal, color: 'from-amber-500 to-orange-600', title: 'Start the System', desc: 'Run the backend server. Processing starts automatically.', terminal: '$ cd backend\n$ uvicorn server:app --reload --host 0.0.0.0 --port 8000' },
+                  { step: 4, icon: Monitor, color: 'from-emerald-500 to-teal-600', title: 'View Live Analytics', desc: 'Open Live Analytics to see real-time processing progress and results.' },
+                ].map(s => (
+                  <div key={s.step} className="flex items-start gap-4 p-5 rounded-2xl bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-700/50 hover:shadow-card transition-all">
+                    <div className={'w-10 h-10 rounded-xl bg-gradient-to-br ' + s.color + ' flex items-center justify-center shadow-md flex-shrink-0'}>
+                      <span className="text-white font-extrabold text-sm">{s.step}</span>
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <h4 className="font-bold text-gray-900 dark:text-white flex items-center gap-2">
+                        <s.icon className="w-4 h-4 text-gray-400" />{s.title}
+                      </h4>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">{s.desc}</p>
+                      {s.code && (
+                        <pre className="mt-2.5 text-xs text-gray-500 dark:text-gray-400 font-mono bg-gray-100 dark:bg-gray-700 p-3 rounded-xl border border-gray-200 dark:border-gray-600">{s.code}</pre>
+                      )}
+                      {s.terminal && (
+                        <pre className="mt-2.5 text-xs font-mono bg-gray-900 text-emerald-400 p-3 rounded-xl border border-gray-700">{s.terminal}</pre>
+                      )}
                     </div>
                   </div>
-                </div>
-
-                <div className="flex items-start space-x-4 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
-                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold">2</div>
-                  <div className="flex-1">
-                    <h4 className="font-medium text-gray-900 dark:text-white flex items-center">
-                      <Video className="w-4 h-4 mr-2 text-blue-500" />
-                      Add Input Video
-                    </h4>
-                    <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
-                      Place your classroom video as <code className="bg-gray-200 dark:bg-gray-700 px-2 py-0.5 rounded text-xs">input.mp4</code> in the project root directory.
-                    </p>
-                  </div>
-                </div>
-
-                <div className="flex items-start space-x-4 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
-                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-blue-500 text-white flex items-center justify-center font-bold">3</div>
-                  <div className="flex-1">
-                    <h4 className="font-medium text-gray-900 dark:text-white flex items-center">
-                      <Terminal className="w-4 h-4 mr-2 text-blue-500" />
-                      Start the System
-                    </h4>
-                    <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
-                      Run the backend server. Processing starts automatically.
-                    </p>
-                    <div className="mt-2 text-xs font-mono bg-gray-900 text-green-400 p-3 rounded">
-                      <span className="text-gray-500">$</span> cd backend<br/>
-                      <span className="text-gray-500">$</span> uvicorn server:app --reload --host 0.0.0.0 --port 8000
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex items-start space-x-4 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
-                  <div className="flex-shrink-0 w-8 h-8 rounded-full bg-green-500 text-white flex items-center justify-center font-bold">4</div>
-                  <div className="flex-1">
-                    <h4 className="font-medium text-gray-900 dark:text-white flex items-center">
-                      <Monitor className="w-4 h-4 mr-2 text-green-500" />
-                      View Live Analytics
-                    </h4>
-                    <p className="text-sm text-gray-600 dark:text-gray-300 mt-1">
-                      Open <strong>Live Analytics</strong> to see real-time processing progress, detected students, and attendance results.
-                    </p>
-                  </div>
-                </div>
+                ))}
               </div>
             </div>
 
             {/* Features Grid */}
             <div>
-              <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
-                <Zap className="w-5 h-5 mr-2 text-yellow-500" />
+              <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+                <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center">
+                  <Sparkles className="w-4 h-4 text-white" />
+                </div>
                 Key Features
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                {features.map((feature, index) => (
-                  <div key={index} className="flex items-start space-x-3 p-4 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
-                    <div className={`p-2 rounded-lg ${colorClasses[feature.color]}`}>
-                      <feature.icon className="w-5 h-5" />
+                {features.map((f, i) => (
+                  <div key={i} className="flex items-start gap-3 p-4 rounded-2xl bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-700/50 hover:shadow-card transition-all">
+                    <div className={'w-10 h-10 rounded-xl bg-gradient-to-br ' + f.gradient + ' flex items-center justify-center shadow-md flex-shrink-0'}>
+                      <f.icon className="w-5 h-5 text-white" />
                     </div>
                     <div>
-                      <h4 className="font-medium text-gray-900 dark:text-white">{feature.title}</h4>
-                      <p className="text-sm text-gray-600 dark:text-gray-300">{feature.description}</p>
+                      <h4 className="font-bold text-gray-900 dark:text-white">{f.title}</h4>
+                      <p className="text-sm text-gray-600 dark:text-gray-400 mt-0.5">{f.description}</p>
                     </div>
                   </div>
                 ))}
@@ -274,16 +164,23 @@ const Help: React.FC = () => {
             </div>
 
             {/* Image Guidelines */}
-            <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
-              <h4 className="font-medium text-blue-800 dark:text-blue-300 flex items-center mb-2">
-                <Image className="w-4 h-4 mr-2" />
+            <div className="rounded-2xl bg-gradient-to-br from-blue-50 to-cyan-50 dark:from-blue-900/10 dark:to-cyan-900/10 border border-blue-200 dark:border-blue-800 p-5">
+              <h4 className="font-bold text-blue-800 dark:text-blue-300 flex items-center gap-2 mb-3">
+                <Image className="w-4 h-4" />
                 Tips for Best Recognition Results
               </h4>
-              <ul className="text-sm text-blue-700 dark:text-blue-300 space-y-1">
-                <li className="flex items-center"><CheckCircle className="w-3 h-3 mr-2" /> Use clear, well-lit photos showing the full face</li>
-                <li className="flex items-center"><CheckCircle className="w-3 h-3 mr-2" /> Include photos from different angles (front, slight left/right)</li>
-                <li className="flex items-center"><CheckCircle className="w-3 h-3 mr-2" /> 5-10 images per student is optimal</li>
-                <li className="flex items-center"><CheckCircle className="w-3 h-3 mr-2" /> Avoid blurry or heavily filtered images</li>
+              <ul className="text-sm text-blue-700 dark:text-blue-300 space-y-2">
+                {[
+                  'Use clear, well-lit photos showing the full face',
+                  'Include photos from different angles (front, slight left/right)',
+                  '5-10 images per student is optimal',
+                  'Avoid blurry or heavily filtered images',
+                ].map((tip, i) => (
+                  <li key={i} className="flex items-center gap-2">
+                    <CheckCircle className="w-3.5 h-3.5 flex-shrink-0" />
+                    {tip}
+                  </li>
+                ))}
               </ul>
             </div>
           </div>
@@ -291,12 +188,12 @@ const Help: React.FC = () => {
 
         {/* FAQ Content */}
         {activeTab === 'faq' && (
-          <div className="divide-y divide-gray-200 dark:divide-gray-700">
+          <div className="divide-y divide-gray-100 dark:divide-gray-800">
             {faqItems.map((item, index) => (
               <details key={index} className="group">
-                <summary className="flex items-center justify-between p-5 cursor-pointer list-none hover:bg-gray-50 dark:hover:bg-gray-800/50">
-                  <span className="font-medium text-gray-900 dark:text-white pr-4">{item.question}</span>
-                  <ChevronRight className="w-5 h-5 text-gray-500 group-open:rotate-90 transition-transform flex-shrink-0" />
+                <summary className="flex items-center justify-between p-5 cursor-pointer list-none hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                  <span className="font-semibold text-gray-900 dark:text-white pr-4">{item.question}</span>
+                  <ChevronRight className="w-5 h-5 text-gray-400 group-open:rotate-90 transition-transform flex-shrink-0" />
                 </summary>
                 <div className="px-5 pb-5 text-gray-600 dark:text-gray-300 text-sm leading-relaxed">
                   {item.answer}
@@ -312,24 +209,26 @@ const Help: React.FC = () => {
             {troubleshootItems.map((item, index) => (
               <div 
                 key={index} 
-                className={`p-4 rounded-lg border ${
+                className={`p-5 rounded-2xl border transition-all hover:shadow-card ${
                   item.severity === 'warning' 
-                    ? 'bg-yellow-50 dark:bg-yellow-900/10 border-yellow-200 dark:border-yellow-800' 
+                    ? 'bg-amber-50 dark:bg-amber-900/10 border-amber-200 dark:border-amber-800' 
                     : 'bg-blue-50 dark:bg-blue-900/10 border-blue-200 dark:border-blue-800'
                 }`}
               >
-                <div className="flex items-start space-x-3">
-                  <item.icon className={`w-5 h-5 mt-0.5 ${
-                    item.severity === 'warning' ? 'text-yellow-600 dark:text-yellow-400' : 'text-blue-600 dark:text-blue-400'
-                  }`} />
+                <div className="flex items-start gap-3">
+                  <div className={`w-8 h-8 rounded-xl flex items-center justify-center flex-shrink-0 ${
+                    item.severity === 'warning' ? 'bg-gradient-to-br from-amber-400 to-orange-500' : 'bg-gradient-to-br from-blue-400 to-cyan-500'
+                  }`}>
+                    <item.icon className="w-4 h-4 text-white" />
+                  </div>
                   <div>
-                    <h4 className={`font-medium ${
-                      item.severity === 'warning' ? 'text-yellow-800 dark:text-yellow-300' : 'text-blue-800 dark:text-blue-300'
+                    <h4 className={`font-bold ${
+                      item.severity === 'warning' ? 'text-amber-800 dark:text-amber-300' : 'text-blue-800 dark:text-blue-300'
                     }`}>
                       {item.issue}
                     </h4>
                     <p className={`text-sm mt-1 ${
-                      item.severity === 'warning' ? 'text-yellow-700 dark:text-yellow-400' : 'text-blue-700 dark:text-blue-400'
+                      item.severity === 'warning' ? 'text-amber-700 dark:text-amber-400' : 'text-blue-700 dark:text-blue-400'
                     }`}>
                       <strong>Solution:</strong> {item.solution}
                     </p>
@@ -342,37 +241,34 @@ const Help: React.FC = () => {
       </div>
 
       {/* Tech Stack */}
-      <div className="bg-card-light dark:bg-card-dark rounded-xl shadow-sm border border-gray-200 dark:border-gray-700 p-6">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-4 flex items-center">
-          <Info className="w-5 h-5 mr-2 text-gray-500" />
+      <div className="glass-card p-6">
+        <h3 className="text-lg font-bold text-gray-900 dark:text-white mb-4 flex items-center gap-2">
+          <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-gray-500 to-slate-600 flex items-center justify-center">
+            <Info className="w-4 h-4 text-white" />
+          </div>
           Technology Stack
         </h3>
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="text-center p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
-            <div className="text-2xl font-bold text-blue-600 dark:text-blue-400">YOLOv8</div>
-            <div className="text-xs text-gray-500 dark:text-gray-400">Face Detection</div>
-          </div>
-          <div className="text-center p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
-            <div className="text-2xl font-bold text-green-600 dark:text-green-400">FaceNet</div>
-            <div className="text-xs text-gray-500 dark:text-gray-400">Recognition</div>
-          </div>
-          <div className="text-center p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
-            <div className="text-2xl font-bold text-purple-600 dark:text-purple-400">FastAPI</div>
-            <div className="text-xs text-gray-500 dark:text-gray-400">Backend</div>
-          </div>
-          <div className="text-center p-3 bg-gray-50 dark:bg-gray-800/50 rounded-lg">
-            <div className="text-2xl font-bold text-pink-600 dark:text-pink-400">React</div>
-            <div className="text-xs text-gray-500 dark:text-gray-400">Frontend</div>
-          </div>
+          {[
+            { name: 'YOLOv8', sub: 'Face Detection', gradient: 'from-blue-500 to-cyan-600' },
+            { name: 'FaceNet', sub: 'Recognition', gradient: 'from-emerald-500 to-teal-600' },
+            { name: 'FastAPI', sub: 'Backend', gradient: 'from-violet-500 to-purple-600' },
+            { name: 'React', sub: 'Frontend', gradient: 'from-pink-500 to-rose-600' },
+          ].map(t => (
+            <div key={t.name} className="text-center p-4 rounded-2xl bg-gray-50 dark:bg-gray-800/50 border border-gray-100 dark:border-gray-700/50 hover:shadow-card transition-all">
+              <div className={'text-2xl font-extrabold bg-gradient-to-r ' + t.gradient + ' bg-clip-text text-transparent'}>{t.name}</div>
+              <div className="text-xs text-gray-500 dark:text-gray-400 font-medium mt-1">{t.sub}</div>
+            </div>
+          ))}
         </div>
       </div>
 
       {/* Footer */}
-      <div className="bg-gradient-to-r from-purple-600 to-blue-600 rounded-xl shadow-sm p-6 text-white">
+      <div className="rounded-2xl bg-gradient-to-r from-violet-600 via-purple-600 to-blue-600 p-6 text-white shadow-lg">
         <div className="flex flex-col md:flex-row items-center justify-between gap-4">
           <div>
-            <h2 className="text-xl font-semibold mb-1">CORIS - Classroom Observation & Recognition Intelligence System</h2>
-            <p className="text-purple-100 text-sm">AI-powered attendance tracking for modern classrooms</p>
+            <h2 className="text-xl font-extrabold mb-1">CORIS - Classroom Observation & Recognition Intelligence System</h2>
+            <p className="text-purple-200 text-sm">AI-powered attendance tracking for modern classrooms</p>
           </div>
           <div className="flex space-x-3">
             <a

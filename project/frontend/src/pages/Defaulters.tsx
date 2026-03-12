@@ -1,6 +1,10 @@
 import React, { useEffect, useState, useMemo } from 'react';
-import { AlertTriangle, Mail, Search, TrendingDown, ShieldAlert, Filter, CheckCircle, X, RefreshCw } from 'lucide-react';
+import {
+  AlertTriangle, Mail, Search, TrendingDown, ShieldAlert, Filter,
+  CheckCircle, X, RefreshCw, UserX, Send, WifiOff,
+} from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
+import { cachedFetch } from '../hooks/useBackend';
 
 const API = 'http://localhost:8000';
 const DEFAULTER_THRESHOLD = 75;
@@ -30,14 +34,15 @@ const Defaulters: React.FC = () => {
   const [showComposer, setShowComposer] = useState(false);
   const [emailSubject, setEmailSubject] = useState('Attendance Alert - Immediate Attention Required');
   const [emailBody, setEmailBody] = useState('');
+  const [offline, setOffline] = useState(false);
 
   const loadData = async () => {
     try {
       setLoading(true);
-      const res = await fetch(API + '/student-insights');
-      const json = await res.json();
-      const d = json.data || json;
-      setStudents(d.students || []);
+      const { data: json, offline: isOffline } = await cachedFetch<any>(API + '/student-insights', '/student-insights');
+      const d = json?.data || json;
+      setStudents(d?.students || []);
+      setOffline(isOffline);
     } catch { /* ignore */ } finally { setLoading(false); }
   };
 
@@ -51,9 +56,9 @@ const Defaulters: React.FC = () => {
   };
 
   const severityConfig = {
-    critical: { label: 'Critical', color: 'text-red-600 dark:text-red-400', bg: 'bg-red-100 dark:bg-red-900/30', border: 'border-red-200 dark:border-red-800', badge: 'bg-red-500' },
-    warning: { label: 'Warning', color: 'text-orange-600 dark:text-orange-400', bg: 'bg-orange-100 dark:bg-orange-900/30', border: 'border-orange-200 dark:border-orange-800', badge: 'bg-orange-500' },
-    moderate: { label: 'Moderate', color: 'text-yellow-600 dark:text-yellow-400', bg: 'bg-yellow-100 dark:bg-yellow-900/30', border: 'border-yellow-200 dark:border-yellow-800', badge: 'bg-yellow-500' },
+    critical: { label: 'Critical', gradient: 'from-red-500 to-rose-600', color: 'text-red-600 dark:text-red-400', bg: 'bg-red-50 dark:bg-red-900/20', border: 'border-red-200 dark:border-red-800', ring: 'ring-red-200 dark:ring-red-900' },
+    warning: { label: 'Warning', gradient: 'from-orange-500 to-amber-600', color: 'text-orange-600 dark:text-orange-400', bg: 'bg-orange-50 dark:bg-orange-900/20', border: 'border-orange-200 dark:border-orange-800', ring: 'ring-orange-200 dark:ring-orange-900' },
+    moderate: { label: 'Moderate', gradient: 'from-yellow-500 to-amber-500', color: 'text-yellow-600 dark:text-yellow-400', bg: 'bg-yellow-50 dark:bg-yellow-900/20', border: 'border-yellow-200 dark:border-yellow-800', ring: 'ring-yellow-200 dark:ring-yellow-900' },
   };
 
   const defaulters = useMemo(() =>
@@ -119,35 +124,51 @@ const Defaulters: React.FC = () => {
 
   if (loading) {
     return (
-      <div className="flex items-center justify-center h-64">
-        <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-purple-600" />
+      <div className="flex flex-col items-center justify-center h-80 gap-4">
+        <div className="w-16 h-16 rounded-2xl bg-gradient-to-br from-red-500 to-rose-600 flex items-center justify-center animate-pulse-slow">
+          <AlertTriangle className="w-8 h-8 text-white" />
+        </div>
+        <p className="text-sm font-semibold text-gray-600 dark:text-gray-400">Analyzing defaulters...</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
-      {/* Header actions */}
-      <div className="flex items-center justify-end">
-        <button onClick={() => loadData()} className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium text-gray-600 dark:text-gray-300 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 rounded-lg transition-colors">
+    <div className="space-y-6 animate-fade-in">
+      {/* Offline Banner */}
+      {offline && students.length > 0 && (
+        <div className="rounded-xl bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800 px-4 py-3 flex items-center gap-3">
+          <WifiOff className="w-4 h-4 text-amber-600 dark:text-amber-400 flex-shrink-0" />
+          <p className="text-sm text-amber-700 dark:text-amber-300"><strong>Offline Mode</strong> — Showing previously cached data. Start the backend to get live updates.</p>
+        </div>
+      )}
+      {/* Header */}
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-xl font-bold text-gray-900 dark:text-white">Defaulter Management</h2>
+          <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Students below {DEFAULTER_THRESHOLD}% attendance threshold</p>
+        </div>
+        <button onClick={() => loadData()} className="btn-secondary flex items-center gap-1.5 text-xs">
           <RefreshCw className="w-3.5 h-3.5" /> Refresh
         </button>
       </div>
 
       {/* Summary Cards */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 animate-stagger">
         {[
-          { label: 'Total Defaulters', value: String(defaulters.length), icon: AlertTriangle, color: 'text-red-600 dark:text-red-400', bg: 'bg-red-50 dark:bg-red-900/20' },
-          { label: 'Critical (<25%)', value: String(criticalCount), icon: ShieldAlert, color: 'text-red-600 dark:text-red-400', bg: 'bg-red-50 dark:bg-red-900/20' },
-          { label: 'Warning (<50%)', value: String(warningCount), icon: TrendingDown, color: 'text-orange-600 dark:text-orange-400', bg: 'bg-orange-50 dark:bg-orange-900/20' },
-          { label: 'Moderate (<75%)', value: String(moderateCount), icon: Filter, color: 'text-yellow-600 dark:text-yellow-400', bg: 'bg-yellow-50 dark:bg-yellow-900/20' },
+          { label: 'Total Defaulters', value: String(defaulters.length), icon: UserX, gradient: 'from-red-500 to-rose-600' },
+          { label: 'Critical (<25%)', value: String(criticalCount), icon: ShieldAlert, gradient: 'from-red-600 to-red-700' },
+          { label: 'Warning (<50%)', value: String(warningCount), icon: TrendingDown, gradient: 'from-orange-500 to-amber-600' },
+          { label: 'Moderate (<75%)', value: String(moderateCount), icon: Filter, gradient: 'from-yellow-500 to-amber-500' },
         ].map(c => (
-          <div key={c.label} className="bg-card-light dark:bg-card-dark rounded-xl border border-gray-200 dark:border-gray-700 p-4">
+          <div key={c.label} className="kpi-card">
             <div className="flex items-center gap-3">
-              <div className={'p-2 rounded-lg ' + c.bg}><c.icon className={'w-5 h-5 ' + c.color} /></div>
+              <div className={'w-10 h-10 rounded-xl bg-gradient-to-br ' + c.gradient + ' flex items-center justify-center shadow-md'}>
+                <c.icon className="w-5 h-5 text-white" />
+              </div>
               <div>
-                <p className="text-xs text-gray-500 dark:text-gray-400">{c.label}</p>
-                <p className={'text-xl font-bold ' + c.color}>{c.value}</p>
+                <p className="text-xs text-gray-500 dark:text-gray-400 font-medium">{c.label}</p>
+                <p className="text-xl font-extrabold text-gray-900 dark:text-white">{c.value}</p>
               </div>
             </div>
           </div>
@@ -156,15 +177,15 @@ const Defaulters: React.FC = () => {
 
       {/* Chart */}
       {chartData.length > 0 && (
-        <div className="bg-card-light dark:bg-card-dark rounded-xl border border-gray-200 dark:border-gray-700 p-5">
-          <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-4">Defaulter Attendance Rates</h3>
-          <ResponsiveContainer width="100%" height={Math.min(chartData.length * 32 + 40, 400)}>
+        <div className="glass-card p-5">
+          <h3 className="section-title mb-4">Defaulter Attendance Rates</h3>
+          <ResponsiveContainer width="100%" height={Math.min(chartData.length * 34 + 40, 400)}>
             <BarChart data={chartData} layout="vertical">
-              <CartesianGrid strokeDasharray="3 3" opacity={0.1} />
-              <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 10 }} />
-              <YAxis dataKey="name" type="category" tick={{ fontSize: 10 }} width={80} />
-              <Tooltip formatter={(v: number) => v + '%'} />
-              <Bar dataKey="attendance" name="Attendance %" radius={[0, 4, 4, 0]}>
+              <CartesianGrid strokeDasharray="3 3" vertical={false} />
+              <XAxis type="number" domain={[0, 100]} tick={{ fontSize: 10, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
+              <YAxis dataKey="name" type="category" tick={{ fontSize: 10, fill: '#94a3b8' }} width={80} axisLine={false} tickLine={false} />
+              <Tooltip contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 20px 60px rgba(0,0,0,0.1)', fontSize: 12 }} formatter={(v: number) => v + '%'} />
+              <Bar dataKey="attendance" name="Attendance %" radius={[0, 6, 6, 0]}>
                 {chartData.map((d, i) => <Cell key={i} fill={d.fill} />)}
               </Bar>
             </BarChart>
@@ -172,21 +193,21 @@ const Defaulters: React.FC = () => {
         </div>
       )}
 
-      {/* Filters & Actions */}
-      <div className="bg-card-light dark:bg-card-dark rounded-xl border border-gray-200 dark:border-gray-700">
-        <div className="p-4 border-b border-gray-200 dark:border-gray-700 flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
+      {/* Filters & List */}
+      <div className="glass-card">
+        <div className="p-5 border-b border-gray-100 dark:border-gray-800 flex flex-col sm:flex-row gap-3 items-start sm:items-center justify-between">
           <div className="flex items-center gap-3 flex-wrap">
-            <h3 className="text-sm font-semibold text-gray-900 dark:text-white">Defaulter List ({filtered.length})</h3>
-            <div className="flex gap-1">
+            <h3 className="section-title">Defaulter List ({filtered.length})</h3>
+            <div className="flex gap-1 bg-gray-100 dark:bg-gray-800 rounded-xl p-1">
               {(['all', 'critical', 'warning', 'moderate'] as Severity[]).map(s => (
                 <button
                   key={s}
                   onClick={() => setSeverity(s)}
                   className={
-                    'px-2.5 py-1 rounded-lg text-xs font-medium transition-colors ' +
+                    'px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ' +
                     (severity === s
-                      ? 'bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300'
-                      : 'text-gray-500 hover:bg-gray-100 dark:hover:bg-gray-700')
+                      ? 'bg-white dark:bg-gray-700 text-gray-900 dark:text-white shadow-sm'
+                      : 'text-gray-500 hover:text-gray-700 dark:hover:text-gray-300')
                   }
                 >
                   {s === 'all' ? 'All' : s.charAt(0).toUpperCase() + s.slice(1)}
@@ -195,19 +216,16 @@ const Defaulters: React.FC = () => {
             </div>
           </div>
           <div className="flex items-center gap-2 w-full sm:w-auto">
-            <div className="relative flex-1 sm:w-48">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
+            <div className="relative flex-1 sm:w-56">
+              <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-gray-400" />
               <input
                 value={search} onChange={e => setSearch(e.target.value)}
-                className="w-full pl-9 pr-3 py-2 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-400 focus:outline-none text-gray-900 dark:text-white"
+                className="input-field pl-10"
                 placeholder="Search..."
               />
             </div>
             {selectedIds.size > 0 && (
-              <button
-                onClick={openComposer}
-                className="flex items-center gap-1.5 px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm rounded-lg transition-colors"
-              >
+              <button onClick={openComposer} className="btn-primary flex items-center gap-1.5">
                 <Mail className="w-4 h-4" />
                 Email ({selectedIds.size})
               </button>
@@ -216,63 +234,64 @@ const Defaulters: React.FC = () => {
         </div>
 
         {/* Defaulter Cards */}
-        <div className="p-4">
+        <div className="p-5">
           {filtered.length > 0 && (
-            <div className="mb-3 flex items-center gap-2">
-              <button onClick={selectAll} className="text-xs text-purple-600 dark:text-purple-400 hover:underline">
+            <div className="mb-4 flex items-center gap-2">
+              <button onClick={selectAll} className="text-xs font-semibold text-primary-600 dark:text-primary-400 hover:underline">
                 {selectedIds.size === filtered.length ? 'Deselect All' : 'Select All'}
               </button>
+              <span className="text-xs text-gray-400">&middot; {selectedIds.size} selected</span>
             </div>
           )}
-          <div className="space-y-2">
+          <div className="space-y-3">
             {filtered.map(s => {
               const sev = getSeverity(s.attendance_rate);
               const cfg = severityConfig[sev as keyof typeof severityConfig];
-              const selected = selectedIds.has(s.name);
+              const isSelected = selectedIds.has(s.name);
               const absent = s.total_sessions - s.total_present;
               return (
                 <div
                   key={s.name}
                   className={
-                    'flex items-center gap-4 p-4 rounded-xl border transition-all cursor-pointer ' +
-                    (selected
-                      ? 'border-purple-400 dark:border-purple-600 bg-purple-50/50 dark:bg-purple-900/10 ring-1 ring-purple-300 dark:ring-purple-700'
-                      : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-800/50')
+                    'flex items-center gap-4 p-4 rounded-2xl border-2 transition-all cursor-pointer hover:shadow-card ' +
+                    (isSelected
+                      ? 'border-primary-400 dark:border-primary-600 bg-primary-50/50 dark:bg-primary-900/10 ring-2 ' + 'ring-primary-200 dark:ring-primary-800'
+                      : 'border-gray-100 dark:border-gray-800 hover:border-gray-200 dark:hover:border-gray-700')
                   }
                   onClick={() => toggleSelect(s.name)}
                 >
                   {/* Checkbox */}
-                  <div className={'w-5 h-5 rounded border-2 flex items-center justify-center flex-shrink-0 ' + (selected ? 'border-purple-500 bg-purple-500' : 'border-gray-300 dark:border-gray-600')}>
-                    {selected && <CheckCircle className="w-3.5 h-3.5 text-white" />}
+                  <div className={'w-5 h-5 rounded-lg border-2 flex items-center justify-center flex-shrink-0 transition-all ' + (isSelected ? 'border-primary-500 bg-primary-500' : 'border-gray-300 dark:border-gray-600')}>
+                    {isSelected && <CheckCircle className="w-3.5 h-3.5 text-white" />}
                   </div>
 
                   {/* Avatar */}
-                  <div className={'w-10 h-10 rounded-full flex items-center justify-center text-white font-bold text-sm flex-shrink-0 ' + (cfg?.badge || 'bg-gray-400')}>
+                  <div className={'avatar w-11 h-11 text-sm bg-gradient-to-br ' + (cfg?.gradient || 'from-gray-400 to-gray-500')}>
                     {s.name.charAt(0)}
                   </div>
 
                   {/* Info */}
                   <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <span className="font-medium text-gray-900 dark:text-white">{s.name}</span>
-                      <span className={'inline-flex px-2 py-0.5 rounded-full text-[10px] font-medium ' + (cfg?.bg || '') + ' ' + (cfg?.color || '')}>
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                      <span className="font-bold text-gray-900 dark:text-white">{s.name}</span>
+                      <span className={'inline-flex px-2.5 py-0.5 rounded-full text-[10px] font-bold ' + (cfg?.bg || '') + ' ' + (cfg?.color || '')}>
                         {cfg?.label || 'Unknown'}
                       </span>
                     </div>
-                    <div className="flex items-center gap-4 mt-1 text-xs text-gray-500 dark:text-gray-400">
-                      <span>Present: {s.total_present}/{s.total_sessions}</span>
-                      <span>Absent: {absent}</span>
-                      <span>Attention: {(s.avg_attention_score * 100).toFixed(0)}%</span>
-                      <span>Last: {s.last_seen ? new Date(s.last_seen).toLocaleDateString() : 'Never'}</span>
+                    <div className="flex items-center gap-4 mt-1.5 text-xs text-gray-500 dark:text-gray-400">
+                      <span>Present: <span className="font-semibold text-gray-600 dark:text-gray-300">{s.total_present}/{s.total_sessions}</span></span>
+                      <span>Absent: <span className="font-semibold text-red-500">{absent}</span></span>
+                      <span>Attention: <span className="font-semibold text-gray-600 dark:text-gray-300">{(s.avg_attention_score * 100).toFixed(0)}%</span></span>
+                      <span>Last: <span className="font-medium">{s.last_seen ? new Date(s.last_seen).toLocaleDateString() : 'Never'}</span></span>
                     </div>
                   </div>
 
                   {/* Attendance Rate */}
                   <div className="text-right flex-shrink-0">
-                    <div className={'text-lg font-bold ' + (cfg?.color || '')}>{s.attendance_rate.toFixed(1)}%</div>
-                    <div className="w-20 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full mt-1 overflow-hidden">
+                    <div className={'text-xl font-extrabold ' + (cfg?.color || '')}>{s.attendance_rate.toFixed(1)}%</div>
+                    <div className="w-20 progress-bar h-2 mt-1.5">
                       <div
-                        className={'h-full rounded-full ' + (sev === 'critical' ? 'bg-red-500' : sev === 'warning' ? 'bg-orange-500' : 'bg-yellow-500')}
+                        className={'progress-fill bg-gradient-to-r ' + (cfg?.gradient || 'from-gray-400 to-gray-500')}
                         style={{ width: s.attendance_rate + '%' }}
                       />
                     </div>
@@ -281,9 +300,9 @@ const Defaulters: React.FC = () => {
               );
             })}
             {filtered.length === 0 && (
-              <div className="text-center py-12 text-gray-400">
-                <CheckCircle className="w-12 h-12 mx-auto mb-3 opacity-30" />
-                <p className="text-sm font-medium">{defaulters.length === 0 ? 'No defaulters! All students meet attendance requirements.' : 'No defaulters match your filter.'}</p>
+              <div className="text-center py-14 text-gray-400">
+                <CheckCircle className="w-12 h-12 mx-auto mb-3 opacity-20" />
+                <p className="text-sm font-semibold">{defaulters.length === 0 ? 'No defaulters! All students meet attendance requirements.' : 'No defaulters match your filter.'}</p>
               </div>
             )}
           </div>
@@ -292,32 +311,37 @@ const Defaulters: React.FC = () => {
 
       {/* Email Composer Modal */}
       {showComposer && (
-        <div className="fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4" onClick={() => setShowComposer(false)}>
-          <div className="bg-card-light dark:bg-card-dark rounded-2xl border border-gray-200 dark:border-gray-700 shadow-2xl w-full max-w-2xl max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
-              <h2 className="text-lg font-bold text-gray-900 dark:text-white">Compose Alert Email</h2>
-              <button onClick={() => setShowComposer(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg"><X className="w-5 h-5" /></button>
+        <div className="modal-overlay" onClick={() => setShowComposer(false)}>
+          <div className="modal-content max-w-2xl max-h-[85vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+            <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100 dark:border-gray-800">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
+                  <Mail className="w-5 h-5 text-white" />
+                </div>
+                <h2 className="text-lg font-bold text-gray-900 dark:text-white">Compose Alert Email</h2>
+              </div>
+              <button onClick={() => setShowComposer(false)} className="p-2 hover:bg-gray-100 dark:hover:bg-gray-800 rounded-xl transition-colors"><X className="w-5 h-5 text-gray-400" /></button>
             </div>
             <div className="p-6 space-y-4">
               <div>
-                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Subject</label>
+                <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wider">Subject</label>
                 <input
                   value={emailSubject} onChange={e => setEmailSubject(e.target.value)}
-                  className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-400 focus:outline-none text-gray-900 dark:text-white"
+                  className="input-field"
                 />
               </div>
               <div>
-                <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Body</label>
+                <label className="block text-xs font-semibold text-gray-500 dark:text-gray-400 mb-1.5 uppercase tracking-wider">Body</label>
                 <textarea
                   value={emailBody} onChange={e => setEmailBody(e.target.value)}
                   rows={12}
-                  className="w-full px-3 py-2 text-sm bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-lg focus:ring-2 focus:ring-purple-400 focus:outline-none text-gray-900 dark:text-white resize-y"
+                  className="input-field resize-y"
                 />
               </div>
-              <div className="flex justify-end gap-3">
-                <button onClick={() => setShowComposer(false)} className="px-4 py-2 text-sm text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">Cancel</button>
-                <button onClick={sendEmails} className="flex items-center gap-2 px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm rounded-lg transition-colors">
-                  <Mail className="w-4 h-4" />Open in Mail Client
+              <div className="flex justify-end gap-3 pt-2">
+                <button onClick={() => setShowComposer(false)} className="btn-ghost">Cancel</button>
+                <button onClick={sendEmails} className="btn-primary flex items-center gap-2">
+                  <Send className="w-4 h-4" />Open in Mail Client
                 </button>
               </div>
             </div>

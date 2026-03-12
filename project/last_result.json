@@ -1,6 +1,6 @@
 {
-  "video_path": "C:\\Users\\Ramsaheb Prasad\\Desktop\\AIML\\DONE\\Computer Vision\\OutHouse Project\\project\\input1.mp4",
-  "output_video": "C:\\Users\\Ramsaheb Prasad\\Desktop\\AIML\\DONE\\Computer Vision\\OutHouse Project\\project\\attendance_output.mp4",
+  "video_path": "C:\\Users\\Ramsaheb Prasad\\Documents\\GitHub\\ai-powered-classroom-monitoring-system-\\project\\input1.mp4",
+  "output_video": "C:\\Users\\Ramsaheb Prasad\\Documents\\GitHub\\ai-powered-classroom-monitoring-system-\\project\\attendance_output.mp4",
   "gallery_stats": {
     "Harsh": {
       "num_images": 7,
@@ -1810,10 +1810,10 @@
     "gallery_cached": true,
     "cache_dir": "cache",
     "models_size_mb": 106.8214635848999,
-    "gallery_size_mb": 0.02825450897216797,
+    "gallery_size_mb": 0.028260231018066406,
     "gallery_people_count": 7
   },
-  "timestamp": "2026-03-12T18:24:51.147850",
+  "timestamp": "2026-03-12T18:57:37.224324",
   "summary": {
     "total_people": 6,
     "present_people": 6,
@@ -1824,12 +1824,12 @@
     {
       "name": "Harsh",
       "value": 423,
-      "color": "#3B82F6"
+      "color": "#6B7280"
     },
     {
       "name": "Harshit",
       "value": 1159,
-      "color": "#6B7280"
+      "color": "#EC4899"
     },
     {
       "name": "Unknown",
@@ -1839,17 +1839,17 @@
     {
       "name": "Rajendra",
       "value": 1236,
-      "color": "#EC4899"
+      "color": "#EF4444"
     },
     {
       "name": "Harshal",
       "value": 1193,
-      "color": "#EF4444"
+      "color": "#EC4899"
     },
     {
       "name": "Vishal",
       "value": 1236,
-      "color": "#8B5CF6"
+      "color": "#EF4444"
     },
     {
       "name": "Krish",
