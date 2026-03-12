@@ -1,0 +1,5 @@
+name,presence_seconds,presence_percentage,present,avg_confidence,num_tracks,detection_sources
+Harsh,8.36,35.5,1,0.874,1,MTCNN
+Harshal,23.49,99.7,1,0.911,1,MTCNN
+Rajendra,20.8,88.3,1,0.819,1,MTCNN
+Vishal,23.46,99.6,1,0.853,1,MTCNN

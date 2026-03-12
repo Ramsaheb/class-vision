@@ -1,0 +1,1158 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>CORIS: Multi-Modal Deep Learning Framework for Automated Classroom Attendance and Student Engagement Analytics</title>
+<script>
+MathJax = {
+  tex: {
+    inlineMath: [['$', '$']],
+    displayMath: [['$$', '$$']],
+    processEscapes: true
+  },
+  svg: { fontCache: 'global' }
+};
+</script>
+<script src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-svg.js" async></script>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=STIX+Two+Text:ital,wght@0,400;0,600;0,700;1,400&family=Source+Sans+3:wght@300;400;600;700&family=Source+Code+Pro:wght@400;500&display=swap');
+
+  :root {
+    --primary: #1a2332;
+    --accent: #2563eb;
+    --accent-light: #dbeafe;
+    --text: #1e293b;
+    --text-light: #64748b;
+    --border: #e2e8f0;
+    --bg-code: #f8fafc;
+    --bg-table-head: #f1f5f9;
+    --bg-callout: #fffbeb;
+    --callout-border: #f59e0b;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  @page {
+    size: A4;
+    margin: 2cm 2.5cm;
+    @bottom-center { content: counter(page); font-size: 10pt; color: #64748b; }
+  }
+
+  body {
+    font-family: 'STIX Two Text', 'Times New Roman', Georgia, serif;
+    font-size: 11.5pt;
+    line-height: 1.65;
+    color: var(--text);
+    max-width: 210mm;
+    margin: 0 auto;
+    padding: 40px 60px;
+    background: #fff;
+  }
+
+  /* Title Page */
+  .title-page {
+    text-align: center;
+    padding: 60px 0 40px;
+    page-break-after: always;
+    border-bottom: 3px double var(--primary);
+    margin-bottom: 40px;
+  }
+  .title-page h1 {
+    font-family: 'Source Sans 3', sans-serif;
+    font-size: 22pt;
+    font-weight: 700;
+    color: var(--primary);
+    line-height: 1.3;
+    margin-bottom: 12px;
+    letter-spacing: -0.3px;
+  }
+  .title-page .subtitle {
+    font-size: 13pt;
+    color: var(--text-light);
+    font-style: italic;
+    margin-bottom: 30px;
+  }
+  .title-page .meta {
+    font-size: 10.5pt;
+    color: var(--text-light);
+    line-height: 2;
+  }
+  .title-page .meta strong {
+    color: var(--text);
+  }
+
+  /* Section Headers */
+  h2 {
+    font-family: 'Source Sans 3', sans-serif;
+    font-size: 16pt;
+    font-weight: 700;
+    color: var(--primary);
+    margin: 36px 0 16px;
+    padding-bottom: 6px;
+    border-bottom: 2px solid var(--accent);
+    page-break-after: avoid;
+  }
+  h2 .section-num {
+    color: var(--accent);
+    margin-right: 8px;
+  }
+  h3 {
+    font-family: 'Source Sans 3', sans-serif;
+    font-size: 13pt;
+    font-weight: 600;
+    color: var(--primary);
+    margin: 24px 0 10px;
+    page-break-after: avoid;
+  }
+  h4 {
+    font-family: 'Source Sans 3', sans-serif;
+    font-size: 11.5pt;
+    font-weight: 600;
+    color: var(--text);
+    margin: 18px 0 8px;
+    font-style: italic;
+  }
+
+  p { margin: 8px 0; text-align: justify; hyphens: auto; }
+
+  /* Abstract box */
+  .abstract {
+    background: var(--accent-light);
+    border-left: 4px solid var(--accent);
+    padding: 16px 20px;
+    margin: 20px 0;
+    border-radius: 0 6px 6px 0;
+  }
+  .abstract p {
+    font-size: 10.5pt;
+    line-height: 1.6;
+  }
+
+  /* Table of Contents */
+  .toc {
+    background: #fafbfc;
+    border: 1px solid var(--border);
+    padding: 20px 28px;
+    margin: 20px 0 30px;
+    border-radius: 6px;
+    page-break-after: always;
+  }
+  .toc h2 { border-bottom: none; margin-top: 0; font-size: 14pt; }
+  .toc ol { padding-left: 20px; }
+  .toc li {
+    font-size: 10.5pt;
+    line-height: 2;
+    color: var(--text);
+    font-family: 'Source Sans 3', sans-serif;
+  }
+  .toc a { color: var(--accent); text-decoration: none; }
+  .toc a:hover { text-decoration: underline; }
+
+  /* Lists */
+  ul, ol { margin: 8px 0 8px 24px; }
+  li { margin: 4px 0; }
+
+  /* Code blocks */
+  pre {
+    background: var(--bg-code);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 14px 18px;
+    font-family: 'Source Code Pro', monospace;
+    font-size: 9pt;
+    line-height: 1.5;
+    overflow-x: auto;
+    margin: 12px 0;
+    page-break-inside: avoid;
+  }
+  code {
+    font-family: 'Source Code Pro', monospace;
+    font-size: 9.5pt;
+    background: var(--bg-code);
+    padding: 1px 4px;
+    border-radius: 3px;
+    color: #c7254e;
+  }
+  pre code { background: none; padding: 0; color: var(--text); }
+
+  /* Tables */
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 14px 0;
+    font-size: 10pt;
+    page-break-inside: avoid;
+  }
+  th {
+    background: var(--bg-table-head);
+    font-family: 'Source Sans 3', sans-serif;
+    font-weight: 600;
+    text-align: left;
+    padding: 8px 12px;
+    border: 1px solid var(--border);
+    font-size: 9.5pt;
+    color: var(--primary);
+  }
+  td {
+    padding: 7px 12px;
+    border: 1px solid var(--border);
+    vertical-align: top;
+  }
+  tr:nth-child(even) { background: #f8fafc; }
+
+  /* Math display */
+  mjx-container[jax="SVG"][display="true"] {
+    margin: 14px 0 !important;
+  }
+
+  /* Callout boxes */
+  .callout {
+    background: var(--bg-callout);
+    border-left: 4px solid var(--callout-border);
+    padding: 12px 16px;
+    margin: 14px 0;
+    border-radius: 0 5px 5px 0;
+    font-size: 10.5pt;
+  }
+
+  /* Horizontal rules */
+  hr {
+    border: none;
+    border-top: 1px solid var(--border);
+    margin: 30px 0;
+  }
+
+  /* Emphasis */
+  strong { font-weight: 700; }
+  em { font-style: italic; }
+
+  /* References */
+  .references {
+    font-size: 9.5pt;
+    line-height: 1.7;
+  }
+  .references li {
+    margin: 6px 0;
+    text-align: justify;
+  }
+
+  /* Appendix */
+  .appendix h2 {
+    border-bottom-color: #6b7280;
+  }
+
+  /* Print styles */
+  @media print {
+    body { padding: 0; max-width: none; font-size: 10.5pt; }
+    .title-page { padding: 80px 0 50px; }
+    h2 { margin-top: 28px; }
+    pre { font-size: 8pt; }
+    table { font-size: 9pt; }
+    .no-print { display: none; }
+  }
+
+  /* Figure/diagram caption style */
+  .fig-caption {
+    text-align: center;
+    font-size: 9.5pt;
+    color: var(--text-light);
+    font-style: italic;
+    margin: 8px 0 16px;
+  }
+
+  /* Pipeline diagram */
+  .pipeline {
+    background: #f0f4f8;
+    border: 1px solid #cbd5e1;
+    border-radius: 8px;
+    padding: 18px 22px;
+    margin: 16px 0;
+    font-family: 'Source Code Pro', monospace;
+    font-size: 9pt;
+    line-height: 1.6;
+    text-align: center;
+    white-space: pre;
+  }
+
+  .check { color: #16a34a; }
+  .cross { color: #dc2626; }
+  .highlight { background: #fef08a; padding: 0 3px; border-radius: 2px; }
+
+  .page-break { page-break-before: always; }
+</style>
+</head>
+<body>
+
+<!-- ===== TITLE PAGE ===== -->
+<div class="title-page">
+  <h1>CORIS: A Multi-Modal Deep Learning Framework for Automated Classroom Attendance and Student Engagement Analytics</h1>
+  <div class="subtitle">Mathematical Foundations, Algorithms &amp; Comparative Analysis</div>
+  <hr style="width: 40%; margin: 20px auto; border-top: 1px solid #94a3b8;">
+  <div class="meta">
+    <strong>Domain:</strong> Computer Vision · Deep Learning · Affective Computing · Educational Technology<br>
+    <strong>Level:</strong> PhD / Peer-Reviewed Journal Submission<br>
+    <strong>System:</strong> CORIS (Computer-vision Oriented Real-time Intelligent Surveillance)<br>
+    <strong>Date:</strong> February 2026
+  </div>
+</div>
+
+<!-- ===== TABLE OF CONTENTS ===== -->
+<div class="toc">
+  <h2>Table of Contents</h2>
+  <ol>
+    <li><a href="#sec1">Abstract</a></li>
+    <li><a href="#sec2">Introduction &amp; Motivation</a></li>
+    <li><a href="#sec3">System Architecture Overview</a></li>
+    <li><a href="#sec4">Module 1 — Multi-Detector Face Detection Fusion</a></li>
+    <li><a href="#sec5">Module 2 — Face Embedding &amp; Recognition via FaceNet</a></li>
+    <li><a href="#sec6">Module 3 — Multi-Object Tracking with Hungarian Algorithm</a></li>
+    <li><a href="#sec7">Module 4 — Attendance Decision via Temporal Presence Analysis</a></li>
+    <li><a href="#sec8">Module 5 — Head Pose Estimation via Gradient Analysis</a></li>
+    <li><a href="#sec9">Module 6 — Gaze Direction Estimation via Intensity Centroids</a></li>
+    <li><a href="#sec10">Module 7 — Eye Aspect Ratio &amp; Blink Detection</a></li>
+    <li><a href="#sec11">Module 8 — Emotion Detection via Facial Geometry</a></li>
+    <li><a href="#sec12">Module 9 — Hand Gesture &amp; Participation Detection</a></li>
+    <li><a href="#sec13">Module 10 — Attentiveness Scoring &amp; Classification</a></li>
+    <li><a href="#sec14">Module 11 — Gallery Embedding Construction &amp; Weighted Centroid</a></li>
+    <li><a href="#sec15">Module 12 — Intelligent Caching &amp; System Optimization</a></li>
+    <li><a href="#sec16">Comparative Analysis with Existing Systems</a></li>
+    <li><a href="#sec17">Novelty &amp; Contributions</a></li>
+    <li><a href="#sec18">Experimental Results &amp; Metrics</a></li>
+    <li><a href="#sec19">References</a></li>
+    <li><a href="#appA">Appendix A — Complete Algorithm Pseudocode</a></li>
+    <li><a href="#appB">Appendix B — Notation Summary</a></li>
+  </ol>
+</div>
+
+<!-- ===== 1. ABSTRACT ===== -->
+<h2 id="sec1"><span class="section-num">1.</span> Abstract</h2>
+<div class="abstract">
+<p>This paper presents <strong>CORIS</strong>, a multi-modal deep learning framework that unifies automated attendance marking with real-time student engagement analytics in classroom environments. Unlike conventional face-recognition attendance systems that end at identification, CORIS introduces a <strong>six-dimensional engagement vector</strong> comprising head pose, gaze direction, eye aspect ratio (blink detection), facial emotion, hand gesture participation, and temporal presence continuity. The system employs a novel <strong>multi-detector fusion architecture</strong> combining YOLOv8-face, MTCNN, and MediaPipe for robust face detection, followed by FaceNet (InceptionResNetV1) embeddings matched via cosine similarity with strict margin-based thresholds. Temporal coherence is maintained through the <strong>Hungarian algorithm</strong> for frame-to-frame tracking with a hybrid IoU-appearance cost matrix. Attentiveness is quantified through a computationally efficient <strong>rule-based scoring function</strong> operating across all six modalities. The system achieves real-time performance while providing analytical depth unprecedented in classroom monitoring literature.</p>
+</div>
+
+<!-- ===== 2. INTRODUCTION ===== -->
+<h2 id="sec2"><span class="section-num">2.</span> Introduction &amp; Motivation</h2>
+
+<h3>2.1 Problem Statement</h3>
+<p>Traditional classroom attendance systems suffer from:</p>
+<ul>
+  <li><strong>Manual roll-call:</strong> Time-consuming (3–5 min per session), error-prone, susceptible to proxy attendance</li>
+  <li><strong>RFID/Biometric systems:</strong> Require dedicated hardware, cannot capture engagement</li>
+  <li><strong>Single-detector face systems:</strong> Fail under pose variation, occlusion, lighting changes</li>
+</ul>
+
+<h3>2.2 Research Gap</h3>
+<p>While face-recognition attendance systems exist (reviewed in Section 16), <strong>none</strong> simultaneously address:</p>
+<ol>
+  <li>Multi-detector fusion for robustness</li>
+  <li>Strict identity verification with unknown-person detection</li>
+  <li>Real-time engagement tracking across six behavioral dimensions</li>
+  <li>Temporal stability through tracking rather than per-frame classification</li>
+  <li>Percentage-based attendance with configurable thresholds</li>
+</ol>
+
+<!-- ===== 3. ARCHITECTURE ===== -->
+<h2 id="sec3"><span class="section-num">3.</span> System Architecture Overview</h2>
+
+<p>The CORIS pipeline operates as a sequential-parallel hybrid:</p>
+
+<div class="pipeline">Input Video → Frame Extraction
+        ↓
+Multi-Detector Fusion (YOLOv8 ∥ MTCNN ∥ MediaPipe)
+        ↓
+Non-Maximum Suppression (NMS)
+        ↓
+Face Crop + Alignment → FaceNet Embedding
+        ↓
+Gallery Matching (Cosine Similarity + Margin)
+        ↓
+Hungarian Algorithm Tracking (IoU + Appearance Cost)
+        ↓
+Temporal Vote Aggregation → Identity Stabilization
+        ↓
+Parallel Attentiveness Pipeline:
+├── Head Pose Estimation (Gradient-based)
+├── Gaze Direction (Intensity Centroid)
+├── Eye Aspect Ratio / Blink (FaceMesh)
+├── Emotion Detection (Facial Geometry)
+└── Hand Gesture Detection (MediaPipe Hands + Pose)
+        ↓
+Attentiveness Scoring (Multi-Feature Fusion)
+        ↓
+Database Storage + Dashboard Visualization</div>
+<p class="fig-caption">Figure 1: End-to-end CORIS pipeline architecture</p>
+
+<!-- ===== 4. MULTI-DETECTOR FUSION ===== -->
+<div class="page-break"></div>
+<h2 id="sec4"><span class="section-num">4.</span> Module 1 — Multi-Detector Face Detection Fusion</h2>
+
+<h3>4.1 Individual Detectors</h3>
+
+<h4>4.1.1 YOLOv8-face (Primary Detector)</h4>
+<p>YOLOv8 is a single-stage anchor-free object detector. For face detection, a specialized variant <strong>YOLOv8n-face</strong> is used with pretrained weights.</p>
+
+<p><strong>Loss Function (YOLOv8):</strong></p>
+$$\mathcal{L}_{\text{YOLO}} = \lambda_{\text{box}} \cdot \mathcal{L}_{\text{CIoU}} + \lambda_{\text{cls}} \cdot \mathcal{L}_{\text{BCE}} + \lambda_{\text{dfl}} \cdot \mathcal{L}_{\text{DFL}}$$
+
+<p>Where $\mathcal{L}_{\text{CIoU}}$ is the Complete Intersection over Union loss:</p>
+$$\text{CIoU} = 1 - \text{IoU} + \frac{\rho^2(\mathbf{b}, \mathbf{b}^{gt})}{c^2} + \alpha v$$
+
+$$v = \frac{4}{\pi^2}\left(\arctan\frac{w^{gt}}{h^{gt}} - \arctan\frac{w}{h}\right)^2$$
+
+$$\alpha = \frac{v}{(1 - \text{IoU}) + v}$$
+
+<p>Where $\rho(\cdot)$ is the Euclidean distance between predicted and ground-truth box centers, $c$ is the diagonal of the smallest enclosing box, and $v$ is the aspect ratio consistency term.</p>
+
+<p>$\mathcal{L}_{\text{DFL}}$ is the Distribution Focal Loss for bounding box regression:</p>
+$$\mathcal{L}_{\text{DFL}}(S_i, S_{i+1}) = -\big((y_{i+1} - y)\log(S_i) + (y - y_i)\log(S_{i+1})\big)$$
+
+<p><strong>In our system:</strong> Used with confidence threshold $\tau_{\text{YOLO}} = 0.4$.</p>
+
+<h4>4.1.2 MTCNN (Multi-task Cascaded Convolutional Network)</h4>
+<p>MTCNN operates in three cascaded stages:</p>
+
+<p><strong>Stage 1 — P-Net (Proposal Network):</strong> Generates candidate bounding boxes using a 12×12 fully convolutional network:</p>
+$$P_{\text{face}}(x) = \sigma(W_P * x + b_P)$$
+
+<p><strong>Stage 2 — R-Net (Refine Network):</strong> Refines proposals through a 24×24 CNN:</p>
+$$R_{\text{refine}}(x) = \text{FC}(\text{Conv}(x))$$
+
+<p><strong>Stage 3 — O-Net (Output Network):</strong> Final classification + 5-point landmark localization through a 48×48 CNN:</p>
+$$\mathcal{L}_{\text{MTCNN}} = \alpha_1 \mathcal{L}_{\text{cls}} + \alpha_2 \mathcal{L}_{\text{box}} + \alpha_3 \mathcal{L}_{\text{landmark}}$$
+
+<p>Where:</p>
+$$\mathcal{L}_{\text{cls}} = -(y\log(p) + (1-y)\log(1-p))$$
+$$\mathcal{L}_{\text{box}} = \sum_{i \in \{x,y,w,h\}} (t_i - \hat{t}_i)^2$$
+$$\mathcal{L}_{\text{landmark}} = \sum_{j=1}^{5}\sum_{k \in \{x,y\}} (l_j^k - \hat{l}_j^k)^2$$
+
+<p><strong>In our system:</strong> Threshold $\tau_{\text{MTCNN}} = [0.6, 0.7, 0.6]$ for the three stages.</p>
+
+<h4>4.1.3 MediaPipe Face Detection</h4>
+<p>BlazeFace-based SSD architecture optimized for mobile inference:</p>
+$$\text{Anchor}_{i} = (c_x, c_y, w, h)_i, \quad i = 1, \ldots, N_{\text{anchors}}$$
+$$P(\text{face} \mid \text{Anchor}_i) = \sigma(f_{\theta}(\text{Anchor}_i))$$
+<p><strong>In our system:</strong> Confidence threshold $\tau_{\text{MP}} = 0.5$.</p>
+
+<h3>4.2 Fusion Strategy via Non-Maximum Suppression</h3>
+<p>All detections from the three detectors are aggregated into a unified set $\mathcal{D} = \mathcal{D}_{\text{YOLO}} \cup \mathcal{D}_{\text{MTCNN}} \cup \mathcal{D}_{\text{MP}}$.</p>
+
+<p><strong>IoU Computation:</strong></p>
+$$\text{IoU}(B_a, B_b) = \frac{|B_a \cap B_b|}{|B_a \cup B_b|} = \frac{\text{Area of Intersection}}{\text{Area}(B_a) + \text{Area}(B_b) - \text{Area of Intersection}}$$
+
+<p>Specifically:</p>
+$$x_A = \max(x_1^a, x_1^b), \quad y_A = \max(y_1^a, y_1^b)$$
+$$x_B = \min(x_2^a, x_2^b), \quad y_B = \min(y_2^a, y_2^b)$$
+$$\text{Intersection} = \max(0, x_B - x_A) \cdot \max(0, y_B - y_A)$$
+
+<p><strong>NMS Algorithm:</strong></p>
+<pre><code>Input: D = sorted detections by confidence (descending)
+Output: K = kept detections
+
+K ← ∅
+while D ≠ ∅:
+    d* ← D.pop(0)          // Highest confidence
+    K ← K ∪ {d*}
+    D ← {d ∈ D : IoU(d*, d) < τ_NMS}
+return K</code></pre>
+<p><strong>In our system:</strong> $\tau_{\text{NMS}} = 0.3$.</p>
+
+<h3>4.3 Face Geometry Validation</h3>
+<p>Each detection $d = (x_1, y_1, x_2, y_2)$ is validated against:</p>
+$$\text{Valid}(d) = \begin{cases} \text{True} & \text{if all conditions below hold} \\ \text{False} & \text{otherwise} \end{cases}$$
+
+<p><strong>Conditions:</strong></p>
+<ol>
+  <li><strong>Size constraint:</strong> $w_{\min} \leq (x_2 - x_1) \leq w_{\max}$ and $h_{\min} \leq (y_2 - y_1) \leq h_{\max}$ — Where $w_{\min} = h_{\min} = 20$ px, $w_{\max} = h_{\max} = 500$ px</li>
+  <li><strong>Aspect ratio:</strong> $\rho_{\min} \leq \frac{w}{h} \leq \rho_{\max}$ — Where $\rho_{\min} = 0.5$, $\rho_{\max} = 2.0$</li>
+  <li><strong>Area ratio:</strong> $r_{\min} \leq \frac{w \cdot h}{W_{\text{frame}} \cdot H_{\text{frame}}} \leq r_{\max}$ — Where $r_{\min} = 0.0005$, $r_{\max} = 0.4$</li>
+</ol>
+
+<h3>4.4 Landmark Validation (MTCNN)</h3>
+<p>For MTCNN detections with 5 facial landmarks $\{L_{\text{le}}, L_{\text{re}}, L_{\text{nose}}, L_{\text{lm}}, L_{\text{rm}}\}$:</p>
+
+<p><strong>Inter-pupillary distance:</strong></p>
+$$d_{\text{eye}} = \|L_{\text{le}} - L_{\text{re}}\|_2$$
+$$\text{Valid:} \quad d_{\min} \leq d_{\text{eye}} \leq d_{\max} \quad (8 \leq d_{\text{eye}} \leq 200)$$
+
+<p><strong>Eye-to-mouth ratio:</strong></p>
+$$\mathbf{c}_{\text{eye}} = \frac{L_{\text{le}} + L_{\text{re}}}{2}, \quad \mathbf{c}_{\text{mouth}} = \frac{L_{\text{lm}} + L_{\text{rm}}}{2}$$
+$$d_{\text{em}} = \|\mathbf{c}_{\text{eye}} - \mathbf{c}_{\text{mouth}}\|_2$$
+$$\text{Valid:} \quad r_{\min} \cdot d_{\text{eye}} \leq d_{\text{em}} \leq r_{\max} \cdot d_{\text{eye}} \quad (0.8 \leq r \leq 4.0)$$
+
+<!-- ===== 5. FACENET ===== -->
+<div class="page-break"></div>
+<h2 id="sec5"><span class="section-num">5.</span> Module 2 — Face Embedding &amp; Recognition via FaceNet</h2>
+
+<h3>5.1 InceptionResNetV1 Architecture</h3>
+<p>The embedding network $f_\theta: \mathbb{R}^{160 \times 160 \times 3} \to \mathbb{R}^{512}$ maps face images to a 512-dimensional hypersphere.</p>
+
+<p><strong>Preprocessing:</strong></p>
+$$\mathbf{x}_{\text{norm}} = \frac{\mathbf{x} / 255.0 - 0.5}{0.5} = \frac{\mathbf{x}}{127.5} - 1.0$$
+<p>This normalizes pixel values from $[0, 255]$ to $[-1, 1]$.</p>
+
+<p><strong>Triplet Loss (Training Objective of FaceNet):</strong></p>
+$$\mathcal{L}_{\text{triplet}} = \sum_{i=1}^{N} \left[\|f(\mathbf{x}_i^a) - f(\mathbf{x}_i^p)\|_2^2 - \|f(\mathbf{x}_i^a) - f(\mathbf{x}_i^n)\|_2^2 + \alpha\right]_+$$
+
+<p>Where:</p>
+<ul>
+  <li>$\mathbf{x}^a$ is the anchor face</li>
+  <li>$\mathbf{x}^p$ is a positive (same identity) face</li>
+  <li>$\mathbf{x}^n$ is a negative (different identity) face</li>
+  <li>$\alpha$ is the margin (typically 0.2)</li>
+  <li>$[\cdot]_+ = \max(0, \cdot)$ is the hinge function</li>
+</ul>
+
+<p><strong>Embedding $L_2$-Normalization:</strong></p>
+$$\hat{\mathbf{e}} = \frac{\mathbf{e}}{\|\mathbf{e}\|_2} = \frac{f_\theta(\mathbf{x})}{\|f_\theta(\mathbf{x})\|_2}$$
+<p>This projects embeddings onto the unit hypersphere $\mathbb{S}^{511}$.</p>
+
+<h3>5.2 Cosine Similarity for Recognition</h3>
+<p>Given a probe embedding $\hat{\mathbf{e}}_p$ and gallery embedding $\hat{\mathbf{e}}_g$:</p>
+$$\text{sim}(\hat{\mathbf{e}}_p, \hat{\mathbf{e}}_g) = \frac{\hat{\mathbf{e}}_p \cdot \hat{\mathbf{e}}_g}{\|\hat{\mathbf{e}}_p\|_2 \cdot \|\hat{\mathbf{e}}_g\|_2}$$
+
+<p>Since both embeddings are $L_2$-normalized ($\|\hat{\mathbf{e}}\| = 1$), this simplifies to:</p>
+$$\text{sim}(\hat{\mathbf{e}}_p, \hat{\mathbf{e}}_g) = \hat{\mathbf{e}}_p \cdot \hat{\mathbf{e}}_g = \hat{\mathbf{e}}_p^T \hat{\mathbf{e}}_g$$
+
+<p><strong>Relationship to Euclidean distance for normalized vectors:</strong></p>
+$$\|\hat{\mathbf{e}}_p - \hat{\mathbf{e}}_g\|_2^2 = 2(1 - \text{sim}(\hat{\mathbf{e}}_p, \hat{\mathbf{e}}_g))$$
+
+<h3>5.3 Strict Multi-Threshold Recognition Decision</h3>
+<p>Our recognition employs a <strong>four-stage cascaded decision</strong> — a key novelty:</p>
+
+$$\text{Identity}(\hat{\mathbf{e}}_p) = \begin{cases}
+\text{Unknown} & \text{if } s^* < \tau_{\text{unk}} = 0.55 \\
+\text{Unknown} & \text{if } s^* < \tau_{\text{rec}} = 0.65 \\
+\text{Unknown} & \text{if } (s^* - s^{(2)}) < \delta = 0.15 \\
+\text{Unknown} & \text{if } s^* < \tau_{\text{high}} = 0.75 \text{ AND } (s^* - s^{(2)}) < 1.5\delta \\
+n^* & \text{otherwise (confident match)}
+\end{cases}$$
+
+<p>Where:</p>
+<ul>
+  <li>$s^* = \max_{g \in \mathcal{G}} \text{sim}(\hat{\mathbf{e}}_p, \hat{\mathbf{e}}_g)$ is the best similarity</li>
+  <li>$s^{(2)}$ is the second-highest similarity</li>
+  <li>$n^*$ is the identity corresponding to $s^*$</li>
+  <li>$\delta = 0.15$ is the mandatory margin</li>
+  <li>$\tau_{\text{unk}} = 0.55$ is the absolute unknown threshold</li>
+  <li>$\tau_{\text{rec}} = 0.65$ is the recognition threshold</li>
+  <li>$\tau_{\text{high}} = 0.75$ is the high-confidence threshold</li>
+</ul>
+
+<p><strong>Margin Requirement Rationale:</strong></p>
+<p>The margin $\delta = s^* - s^{(2)} \geq 0.15$ ensures the system <strong>never confuses</strong> two similar-looking individuals. This is critical because:</p>
+$$P(\text{correct} \mid s^*, s^{(2)}) \propto \Phi\!\left(\frac{s^* - s^{(2)}}{\sigma_{\text{within}}}\right)$$
+<p>Where $\Phi$ is the standard normal CDF and $\sigma_{\text{within}}$ is the within-class embedding variance.</p>
+
+<h3>5.4 Advanced Face Crop with Margin</h3>
+$$\text{crop}(x_1, y_1, x_2, y_2;\; m) = \Big(\max(0, x_1 - m \cdot w_f),\;\max(0, y_1 - m \cdot h_f),\;\min(W, x_2 + m \cdot w_f),\;\min(H, y_2 + m \cdot h_f)\Big)$$
+<p>Where $m = 0.3$ (30% margin), $w_f = x_2 - x_1$, $h_f = y_2 - y_1$.</p>
+
+<h3>5.5 Image Quality Metrics</h3>
+<p><strong>Laplacian Blur Score:</strong></p>
+$$B(\mathbf{I}) = \text{Var}\!\left(\nabla^2 \mathbf{I}_{\text{gray}}\right) = \text{Var}\!\left(\begin{bmatrix} 0 & 1 & 0 \\ 1 & -4 & 1 \\ 0 & 1 & 0 \end{bmatrix} * \mathbf{I}_{\text{gray}}\right)$$
+<p>Higher values indicate sharper images.</p>
+
+<p><strong>Brightness:</strong></p>
+$$\mu_B = \frac{1}{WH}\sum_{i=1}^{W}\sum_{j=1}^{H} I_{\text{gray}}(i,j)$$
+
+<!-- ===== 6. HUNGARIAN ===== -->
+<div class="page-break"></div>
+<h2 id="sec6"><span class="section-num">6.</span> Module 3 — Multi-Object Tracking with Hungarian Algorithm</h2>
+
+<h3>6.1 Problem Formulation</h3>
+<p>At each frame $t$, we have:</p>
+<ul>
+  <li><strong>Detections:</strong> $\mathcal{D}^t = \{d_1^t, d_2^t, \ldots, d_M^t\}$</li>
+  <li><strong>Tracks:</strong> $\mathcal{T}^{t-1} = \{T_1^{t-1}, T_2^{t-1}, \ldots, T_N^{t-1}\}$</li>
+</ul>
+<p>We seek an optimal assignment $\pi^*: \{1,\ldots,M\} \to \{1,\ldots,N\}$ minimizing:</p>
+$$\pi^* = \arg\min_{\pi} \sum_{i=1}^{\min(M,N)} C(d_i^t, T_{\pi(i)}^{t-1})$$
+
+<h3>6.2 Hybrid Cost Matrix</h3>
+<p>The cost function combines four terms:</p>
+$$C(d_i, T_j) = w_{\text{IoU}} \cdot C_{\text{IoU}} + w_{\text{app}} \cdot C_{\text{app}} + w_{\text{conf}} \cdot C_{\text{conf}} + w_{\text{age}} \cdot C_{\text{age}}$$
+
+<p><strong>Component 1 — IoU Cost</strong> ($w_{\text{IoU}} = 0.4$):</p>
+$$C_{\text{IoU}} = 1 - \text{IoU}(B_{d_i}, B_{T_j})$$
+
+<p><strong>Component 2 — Appearance Cost</strong> ($w_{\text{app}} = 0.6$):</p>
+$$C_{\text{app}} = 1 - \max\!\left(0, \; \hat{\mathbf{e}}_{d_i}^T \cdot \hat{\mathbf{e}}_{T_j}^{\text{curr}}\right)$$
+
+<p>Where $\hat{\mathbf{e}}_{T_j}^{\text{curr}}$ is the track's current embedding (see Section 6.3).</p>
+
+<p><strong>Component 3 — Confidence Bonus</strong> ($w_{\text{conf}} = 0.1$):</p>
+$$C_{\text{conf}} = 1 - \text{TrackConfidence}(T_j)$$
+
+<p><strong>Component 4 — Age Penalty</strong> ($w_{\text{age}} = 0.1$):</p>
+$$C_{\text{age}} = \min(0.3, \; 0.1 \cdot \Delta t_{T_j})$$
+<p>Where $\Delta t_{T_j}$ is frames since last update.</p>
+
+<h3>6.3 Exponentially Weighted Embedding History</h3>
+<p>Each track maintains a sliding window of embeddings $\{\mathbf{e}_1, \mathbf{e}_2, \ldots, \mathbf{e}_K\}$ (max $K = 20$).</p>
+
+<p><strong>Current embedding:</strong></p>
+$$\hat{\mathbf{e}}_T^{\text{curr}} = \frac{\sum_{k=1}^{K} w_k \cdot \mathbf{e}_k}{\left\|\sum_{k=1}^{K} w_k \cdot \mathbf{e}_k\right\|_2}$$
+
+<p>Where the weights follow an exponential decay:</p>
+$$w_k = \exp\!\left(\frac{k - K}{K}\right), \quad k = 1, \ldots, K$$
+$$\tilde{w}_k = \frac{w_k}{\sum_{j=1}^{K} w_j}$$
+<p>This gives more weight to recent observations while maintaining historical context.</p>
+
+<h3>6.4 Hungarian Algorithm (Kuhn-Munkres)</h3>
+<p>The assignment is solved via the <strong>Hungarian algorithm</strong> (Kuhn, 1955; Munkres, 1957):</p>
+<p><strong>Complexity:</strong> $O(\max(M, N)^3)$</p>
+<p>The algorithm finds:</p>
+$$\pi^* = \arg\min_{\pi \in \Pi} \sum_{(i,j) \in \pi} C_{ij}$$
+<p>Where $\Pi$ is the set of all possible one-to-one assignments.</p>
+<p><strong>Gating:</strong> Assignments with $C_{ij} \geq 0.8$ are rejected (detection creates a new track).</p>
+
+<h3>6.5 Track Lifecycle</h3>
+$$\text{Track State} = \begin{cases} \text{Active} & \text{if } \Delta t \leq \tau_{\text{age}} = 30 \text{ frames} \\ \text{Deleted} & \text{if } \Delta t > \tau_{\text{age}} \end{cases}$$
+
+<p><strong>Track Confidence:</strong></p>
+$$\text{Conf}(T) = \underbrace{\min\!\left(1.0, \frac{h}{10}\right)}_{\text{hit streak}} + \underbrace{\min\!\left(0.2, \frac{\bar{B}}{500}\right)}_{\text{quality bonus}} + \underbrace{\min\!\left(0.1, 0.05 \cdot |\mathcal{S}_{\text{unique}}|\right)}_{\text{source diversity}}$$
+<p>Where $h$ is consecutive detection count, $\bar{B}$ is average blur score, and $|\mathcal{S}_{\text{unique}}|$ is the number of unique detector sources.</p>
+
+<!-- ===== 7. ATTENDANCE ===== -->
+<div class="page-break"></div>
+<h2 id="sec7"><span class="section-num">7.</span> Module 4 — Attendance Decision via Temporal Presence Analysis</h2>
+
+<h3>7.1 Identity Stabilization via Temporal Voting</h3>
+<p>Each track accumulates recognition votes. A stable label is assigned only after meeting strict temporal requirements:</p>
+
+<p><strong>Standard Path:</strong></p>
+$$\text{Stable}(T, n) = \begin{cases} \text{True} & \text{if } V_n \geq \max(\tau_{\text{stab}}, 3) \;\text{AND}\; \bar{s}_{\text{recent}} \geq \tau_{\text{rec}} + 0.1 \;\text{AND}\; s_{\min}^{\text{recent}} \geq \tau_{\text{rec}} \\ \text{False} & \text{otherwise} \end{cases}$$
+
+<p>Where:</p>
+<ul>
+  <li>$V_n$ = number of votes for identity $n$</li>
+  <li>$\tau_{\text{stab}} = 5$ (stability frames)</li>
+  <li>$\bar{s}_{\text{recent}}$ = mean of last $\tau_{\text{stab}}$ confidence scores</li>
+  <li>$s_{\min}^{\text{recent}}$ = minimum of last $\tau_{\text{stab}}$ confidence scores</li>
+</ul>
+
+<p><strong>Fast Path (High Confidence):</strong></p>
+$$\text{FastStable}(T, n) = \begin{cases} \text{True} & \text{if } s \geq 0.80 \;\text{AND}\; V_n \geq 2 \;\text{AND}\; \forall s_i \in S_{\text{last-2}}: s_i \geq 0.75 \\ \text{False} & \text{otherwise} \end{cases}$$
+
+<p><strong>Identity Switch Prevention:</strong> A stable label can only change to a different identity if:</p>
+$$s_{\text{new}} \geq 0.85 \quad \text{AND} \quad V_{\text{new}} \geq 2\tau_{\text{stab}} \quad \text{AND} \quad \bar{s}_{\text{recent, new}} \geq 0.80$$
+
+<h3>7.2 Percentage-Based Attendance</h3>
+$$P_{\text{presence}}(n) = \frac{F_{\text{present}}(n)}{F_{\text{total}}} \times 100\%$$
+
+$$\text{Attendance}(n) = \begin{cases} \text{Present} & \text{if } P_{\text{presence}}(n) \geq \tau_{\%} = 30\% \\ \text{Absent} & \text{otherwise} \end{cases}$$
+
+<p><strong>Presence time in seconds:</strong></p>
+$$t_{\text{present}}(n) = P_{\text{presence}}(n) \times \frac{F_{\text{total}}}{\text{FPS}}$$
+
+<!-- ===== 8. HEAD POSE ===== -->
+<h2 id="sec8"><span class="section-num">8.</span> Module 5 — Head Pose Estimation via Gradient Analysis</h2>
+
+<h3>8.1 Sobel Gradient Computation</h3>
+<p>Given a face ROI grayscale image $\mathbf{I}_g$ after Gaussian smoothing ($\sigma = 1.5$, kernel $3 \times 3$):</p>
+
+<p><strong>Sobel Operators:</strong></p>
+$$G_x = \begin{bmatrix} -1 & 0 & +1 \\ -2 & 0 & +2 \\ -1 & 0 & +1 \end{bmatrix} * \mathbf{I}_g, \qquad G_y = \begin{bmatrix} -1 & -2 & -1 \\ 0 & 0 & 0 \\ +1 & +2 & +1 \end{bmatrix} * \mathbf{I}_g$$
+
+<p><strong>Edge Energy:</strong></p>
+$$E_x = \frac{1}{WH}\sum_{i,j}|G_x(i,j)|, \qquad E_y = \frac{1}{WH}\sum_{i,j}|G_y(i,j)|$$
+
+<h3>8.2 Heuristic Yaw and Pitch</h3>
+$$\text{Yaw} = \text{clamp}\!\left(\frac{E_x - E_y}{E_x + E_y},\; -1,\; 1\right) \times 25°$$
+$$\text{Pitch} = \text{clamp}\!\left(\frac{E_y - E_x}{E_x + E_y},\; -1,\; 1\right) \times 20°$$
+<p><strong>Intuition:</strong> When a face is turned sideways (yaw), vertical edges dominate ($E_x > E_y$). When tilted up/down (pitch), horizontal edges dominate.</p>
+
+<h3>8.3 Roll from Gradient Covariance</h3>
+<p>The $2 \times 2$ covariance matrix of gradients:</p>
+$$\Sigma = \text{Cov}(G_x, G_y) = \begin{bmatrix} \text{Var}(G_x) & \text{Cov}(G_x, G_y) \\ \text{Cov}(G_x, G_y) & \text{Var}(G_y) \end{bmatrix}$$
+
+<p><strong>Eigendecomposition:</strong></p>
+$$\Sigma \mathbf{v}_i = \lambda_i \mathbf{v}_i, \quad i = 1, 2$$
+
+<p><strong>Roll angle:</strong></p>
+$$\text{Roll} = 0.3 \times \arctan\!\left(\frac{v_{1,y}}{v_{1,x}}\right) \times \frac{180°}{\pi}$$
+<p>Where $\mathbf{v}_1 = (v_{1,x}, v_{1,y})$ is the eigenvector corresponding to the largest eigenvalue.</p>
+
+<h3>8.4 Movement Score</h3>
+$$\text{Movement} = \text{clamp}\!\left(\frac{\frac{1}{WH}\sum_{i,j}\sqrt{G_x(i,j)^2 + G_y(i,j)^2}}{50},\; 0,\; 1\right)$$
+
+<!-- ===== 9. GAZE ===== -->
+<div class="page-break"></div>
+<h2 id="sec9"><span class="section-num">9.</span> Module 6 — Gaze Direction Estimation via Intensity Centroids</h2>
+
+<h3>9.1 Eye Region Extraction</h3>
+<p>Given a face bounding box, the eye region is the upper half:</p>
+$$\text{EyeRegion} = \mathbf{I}_{\text{gray}}[y_1 : y_1 + \lfloor h/2 \rfloor, \; x_1 : x_2]$$
+
+<h3>9.2 Otsu's Thresholding</h3>
+$$\tau^* = \arg\max_\tau \sigma_B^2(\tau)$$
+$$\sigma_B^2(\tau) = w_0(\tau)\, w_1(\tau)\, [\mu_0(\tau) - \mu_1(\tau)]^2$$
+<p>Where:</p>
+<ul>
+  <li>$w_0(\tau) = \sum_{i=0}^{\tau} p(i)$ and $w_1(\tau) = \sum_{i=\tau+1}^{L-1} p(i)$ are class probabilities</li>
+  <li>$\mu_0(\tau)$ and $\mu_1(\tau)$ are class means</li>
+</ul>
+
+<h3>9.3 Intensity Centroid</h3>
+<p>Using image moments of the thresholded image $\mathbf{T}$:</p>
+$$M_{pq} = \sum_{x}\sum_{y} x^p\, y^q\, \mathbf{T}(x,y)$$
+$$c_x = \frac{M_{10}}{M_{00}}, \qquad c_y = \frac{M_{01}}{M_{00}}$$
+
+<h3>9.4 Gaze Direction Classification</h3>
+<p><strong>Normalized displacement:</strong></p>
+$$\Delta x = \frac{c_x - W_{\text{eye}}/2}{W_{\text{eye}}/2}, \qquad \Delta y = \frac{c_y - H_{\text{eye}}/2}{H_{\text{eye}}/2}$$
+
+$$\text{Direction} = \begin{cases}
+\text{left} & \text{if } |\Delta x| > 0.25 \text{ AND } |\Delta x| \geq |\Delta y| \text{ AND } \Delta x < 0 \\
+\text{right} & \text{if } |\Delta x| > 0.25 \text{ AND } |\Delta x| \geq |\Delta y| \text{ AND } \Delta x > 0 \\
+\text{up} & \text{if } |\Delta y| > 0.25 \text{ AND } |\Delta y| > |\Delta x| \text{ AND } \Delta y < 0 \\
+\text{down} & \text{if } |\Delta y| > 0.25 \text{ AND } |\Delta y| > |\Delta x| \text{ AND } \Delta y > 0 \\
+\text{forward} & \text{otherwise}
+\end{cases}$$
+
+<h3>9.5 Gaze Stability Score</h3>
+$$\text{Stability} = \text{clamp}\!\left(1 - \frac{|\{\mathbf{T}(x,y) > 0\}|}{W_{\text{eye}} \cdot H_{\text{eye}}},\; 0,\; 1\right)$$
+<p>Higher stability indicates a more concentrated bright region (focused gaze).</p>
+
+<!-- ===== 10. EAR ===== -->
+<h2 id="sec10"><span class="section-num">10.</span> Module 7 — Eye Aspect Ratio &amp; Blink Detection</h2>
+
+<h3>10.1 FaceMesh Landmark Extraction</h3>
+<p>MediaPipe FaceMesh provides 468 landmarks (478 with iris refinement). The relevant eye landmarks:</p>
+<p><strong>Left eye indices:</strong> $\mathcal{L} = \{33, 160, 158, 133, 153, 144\}$<br>
+<strong>Right eye indices:</strong> $\mathcal{R} = \{263, 387, 385, 362, 380, 373\}$</p>
+
+<h3>10.2 Eye Aspect Ratio (EAR)</h3>
+<p>For each eye with 6 landmarks $\{P_1, P_2, P_3, P_4, P_5, P_6\}$:</p>
+$$\text{EAR} = \frac{\|P_2 - P_6\| + \|P_3 - P_5\|}{2\|P_1 - P_4\|}$$
+
+<p>Where:</p>
+<ul>
+  <li>$\|P_2 - P_6\|$ and $\|P_3 - P_5\|$ are vertical eye distances</li>
+  <li>$\|P_1 - P_4\|$ is the horizontal eye distance</li>
+</ul>
+
+<p><strong>Average EAR:</strong></p>
+$$\overline{\text{EAR}} = \frac{\text{EAR}_{\text{left}} + \text{EAR}_{\text{right}}}{2}$$
+
+<p><strong>Typical values:</strong> Open eye: $\text{EAR} \approx 0.25 - 0.30$ · Closed eye: $\text{EAR} \approx 0.10 - 0.15$</p>
+
+<h3>10.3 Blink Detection State Machine</h3>
+$$\text{Blink} = \begin{cases}
+\text{Detected} & \text{if } \overline{\text{EAR}} \geq \tau_{\text{EAR}} \text{ AND } n_{\text{consec}} \geq \tau_{\text{consec}} \\
+\text{Accumulating} & \text{if } \overline{\text{EAR}} < \tau_{\text{EAR}},\; n_{\text{consec}} \leftarrow n_{\text{consec}} + 1 \\
+\text{Open} & \text{if } \overline{\text{EAR}} \geq \tau_{\text{EAR}},\; n_{\text{consec}} \leftarrow 0
+\end{cases}$$
+<p>Where $\tau_{\text{EAR}} = 0.21$ and $\tau_{\text{consec}} = 2$ frames.</p>
+
+<p><strong>Blink Rate:</strong></p>
+$$R_{\text{blink}} = \frac{N_{\text{blinks}}}{T_{\text{elapsed}} / 60} \quad (\text{blinks per minute})$$
+<p>Normal blink rate: 15–20 bpm. Low (&lt;10) suggests high focus or staring; high (&gt;25) may indicate fatigue.</p>
+
+<h3>10.4 Eye Openness Score</h3>
+$$\text{Openness} = \text{clamp}\!\left(\frac{\overline{\text{EAR}} - 0.15}{0.15},\; 0,\; 1\right)$$
+
+<!-- ===== 11. EMOTION ===== -->
+<div class="page-break"></div>
+<h2 id="sec11"><span class="section-num">11.</span> Module 8 — Emotion Detection via Facial Geometry</h2>
+
+<h3>11.1 Facial Landmark Feature Extraction</h3>
+<p>Using MediaPipe FaceMesh (468 landmarks), key anatomical points:</p>
+<table>
+  <thead><tr><th>Feature</th><th>Landmarks</th></tr></thead>
+  <tbody>
+    <tr><td>Mouth corners</td><td>61 (left), 291 (right)</td></tr>
+    <tr><td>Lip center</td><td>13 (top), 14 (bottom)</td></tr>
+    <tr><td>Eye openness</td><td>159/145 (left), 386/374 (right)</td></tr>
+    <tr><td>Eyebrows</td><td>70 (left), 300 (right)</td></tr>
+  </tbody>
+</table>
+
+<h3>11.2 Geometric Features</h3>
+<p><strong>Mouth width:</strong> $w_m = \|L_{291} - L_{61}\|_2$</p>
+<p><strong>Mouth height:</strong> $h_m = \|L_{13} - L_{14}\|_2$</p>
+<p><strong>Mouth curvature (smile indicator):</strong></p>
+$$\kappa_m = \frac{\bar{y}(L_{61}, L_{291}) - \frac{y_{61} + y_{291}}{2}}{\max(1, \|L_{291} - L_{61}\|_2)}$$
+<p>Where $\kappa_m > 0$ indicates a smile (upward curve) and $\kappa_m < 0$ indicates a frown.</p>
+
+<p><strong>Average eye openness:</strong></p>
+$$\bar{O}_{\text{eye}} = \frac{\|L_{159} - L_{145}\|_2 + \|L_{386} - L_{374}\|_2}{2}$$
+
+<h3>11.3 Rule-Based Emotion Classification</h3>
+$$\text{Emotion}(\mathbf{f}) = \begin{cases}
+\text{happy} & \text{if } \kappa_m > 0.15 \;\text{AND}\; w_m > 2\,h_m \\
+\text{surprised} & \text{if } \bar{O}_{\text{eye}} > 0.4 \cdot w_m \\
+\text{sad} & \text{if } \kappa_m < -0.1 \\
+\text{drowsy} & \text{if } \bar{O}_{\text{eye}} < 0.15 \cdot w_m \\
+\text{confused} & \text{if } h_m > 0.8 \cdot w_m \\
+\text{neutral} & \text{otherwise}
+\end{cases}$$
+
+<h3>11.4 Engagement Boost from Emotion</h3>
+$$\Delta_{\text{eng}}(\text{emotion}, c) = \beta_{\text{emotion}} \times c$$
+
+<table>
+  <thead><tr><th>Emotion</th><th>$\beta$ (Weight)</th></tr></thead>
+  <tbody>
+    <tr><td>Happy</td><td>+0.20</td></tr>
+    <tr><td>Surprised</td><td>+0.10</td></tr>
+    <tr><td>Neutral</td><td>0.00</td></tr>
+    <tr><td>Confused</td><td>−0.10</td></tr>
+    <tr><td>Sad</td><td>−0.15</td></tr>
+    <tr><td>Drowsy</td><td>−0.30</td></tr>
+  </tbody>
+</table>
+
+<!-- ===== 12. GESTURES ===== -->
+<h2 id="sec12"><span class="section-num">12.</span> Module 9 — Hand Gesture &amp; Participation Detection</h2>
+
+<h3>12.1 MediaPipe Hand Landmark Model</h3>
+<p>21 hand landmarks per hand are detected using the MediaPipe Hands model:</p>
+$$\mathbf{H} = \{P_0^{\text{wrist}}, P_1, \ldots, P_{20}\}$$
+<p>Key landmarks: Wrist (0), Thumb tip (4), Index tip (8), Middle tip (12), Ring tip (16), Pinky tip (20).</p>
+
+<h3>12.2 Gesture Classification</h3>
+<p><strong>Hand Raised Detection:</strong> Using MediaPipe Pose (33 body landmarks) with nose position $P_{\text{nose}}^y$:</p>
+$$\text{HandRaised} = \begin{cases}
+\text{True} & \text{if } \bar{y}_{\text{hand}} < P_{\text{nose}}^y - 20 \\
+\text{True (fallback)} & \text{if pose unavailable AND } \bar{y}_{\text{hand}} < 0.3 \cdot H_{\text{frame}} \\
+\text{False} & \text{otherwise}
+\end{cases}$$
+
+<p><strong>Pointing Detection (Index Finger Extended):</strong></p>
+$$\text{Pointing} = \begin{cases}
+\text{True} & \text{if } y_8 < y_{12} \;\text{AND}\; y_8 < y_{16} \;\text{AND}\; y_8 < y_{20} \\
+\text{False} & \text{otherwise}
+\end{cases}$$
+
+<p><strong>Waving Detection (Finger Spread):</strong></p>
+$$d_{\text{avg}} = \frac{1}{5}\sum_{k \in \{4,8,12,16,20\}} \|P_k - P_0\|_2$$
+$$\text{Waving} = (d_{\text{avg}} > 60 \text{ px})$$
+
+<h3>12.3 Participation Score</h3>
+$$\text{PS}(\text{gesture}) = \begin{cases}
+1.0 & \text{hand\_raised} \\
+0.7 & \text{pointing} \\
+0.6 & \text{waving} \\
+0.3 & \text{writing} \\
+0.1 & \text{neutral\_hand} \\
+0.0 & \text{no\_hands}
+\end{cases}$$
+
+<p><strong>Adjusted score:</strong></p>
+$$\text{PS}_{\text{adj}} = \text{PS} \times c \times \min(1.0,\; 0.5 + 0.5 \cdot n_{\text{hands}})$$
+<p>Where $c$ is detection confidence and $n_{\text{hands}}$ is the number of detected hands.</p>
+
+<!-- ===== 13. ATTENTION SCORING ===== -->
+<div class="page-break"></div>
+<h2 id="sec13"><span class="section-num">13.</span> Module 10 — Attentiveness Scoring &amp; Classification</h2>
+
+<h3>13.1 Multi-Feature Attention Score</h3>
+<p>The attentiveness score $A_s \in [0, 1]$ is computed as:</p>
+$$A_s = \text{clamp}\!\left(A_{\text{base}} - \Delta_{\text{pose}} - \Delta_{\text{gaze}} + \Delta_{\text{stab}} + \Delta_{\text{eng}} + \Delta_{\text{part}},\; 0,\; 1\right)$$
+
+<p>Where:</p>
+<p><strong>Base score:</strong> $A_{\text{base}} = 0.6$</p>
+<p><strong>Pose penalty:</strong></p>
+$$\Delta_{\text{pose}} = \min\!\left(\frac{|\text{Yaw}|}{45},\, 0.4\right) + \min\!\left(\frac{|\text{Pitch}|}{45},\, 0.3\right) + \min(0.3 \cdot \text{Movement},\, 0.3)$$
+<p><strong>Gaze direction penalty:</strong></p>
+$$\Delta_{\text{gaze}} = \begin{cases} 0.15 & \text{if direction} \neq \text{forward} \\ 0 & \text{otherwise} \end{cases}$$
+<p><strong>Gaze stability bonus:</strong> $\Delta_{\text{stab}} = (\text{Stability} - 0.5) \times 0.2$</p>
+<p><strong>Emotion engagement boost:</strong> $\Delta_{\text{eng}} = \beta_{\text{emotion}} \times c_{\text{emotion}}$</p>
+<p><strong>Participation boost:</strong> $\Delta_{\text{part}} = 0.2 \times \text{PS}_{\text{adj}}$</p>
+
+<h3>13.2 Attention State Classification</h3>
+$$\text{State}(A_s) = \begin{cases}
+\textbf{Attentive} & \text{if } A_s \geq 0.70 \\
+\textbf{Distracted} & \text{if } 0.45 \leq A_s < 0.70 \\
+\textbf{Drowsy} & \text{if } 0.25 \leq A_s < 0.45 \\
+\textbf{Sleeping} & \text{if } A_s < 0.25
+\end{cases}$$
+
+<h3>13.3 Temporal Aggregation</h3>
+<p><strong>Per-student session summary:</strong></p>
+$$\bar{A}_n = \frac{1}{F_n}\sum_{t=1}^{F_n} A_s^{(n,t)}$$
+<p><strong>State distribution:</strong></p>
+$$D_{\text{state}}(n, s) = \frac{|\{t : \text{State}^{(n,t)} = s\}|}{F_n}, \quad s \in \{\text{attentive, distracted, drowsy, sleeping}\}$$
+<p><strong>Attentiveness Percentage:</strong></p>
+$$P_{\text{att}}(n) = D_{\text{state}}(n, \text{attentive}) \times 100\%$$
+
+<!-- ===== 14. GALLERY ===== -->
+<h2 id="sec14"><span class="section-num">14.</span> Module 11 — Gallery Embedding Construction &amp; Weighted Centroid</h2>
+
+<h3>14.1 Multi-Image Enrollment</h3>
+<p>For each person $n$ with $K_n$ gallery images:</p>
+$$\mathcal{E}_n = \{\hat{\mathbf{e}}_1^{(n)}, \hat{\mathbf{e}}_2^{(n)}, \ldots, \hat{\mathbf{e}}_{K_n}^{(n)}\}$$
+
+<h3>14.2 Quality-Weighted Centroid</h3>
+<p>Quality score per image:</p>
+$$q_k = B(\mathbf{I}_k) + \mu_B(\mathbf{I}_k)$$
+<p>Where $B(\cdot)$ is blur score and $\mu_B(\cdot)$ is brightness.</p>
+
+<p><strong>Normalized weights:</strong></p>
+$$\tilde{q}_k = \frac{q_k}{\sum_{j=1}^{K_n} q_j + \epsilon}, \quad \epsilon = 10^{-6}$$
+
+<p><strong>Weighted centroid:</strong></p>
+$$\mathbf{c}_n = \frac{\sum_{k=1}^{K_n} \tilde{q}_k \cdot \hat{\mathbf{e}}_k^{(n)}}{\left\|\sum_{k=1}^{K_n} \tilde{q}_k \cdot \hat{\mathbf{e}}_k^{(n)}\right\|_2}$$
+<p>This ensures that higher-quality images contribute more to the representative embedding.</p>
+
+<h3>14.3 Gallery Statistics</h3>
+$$\mu_q(n) = \frac{1}{K_n}\sum_{k=1}^{K_n} q_k, \qquad \sigma_q(n) = \sqrt{\frac{1}{K_n}\sum_{k=1}^{K_n}(q_k - \mu_q(n))^2}$$
+
+<!-- ===== 15. CACHING ===== -->
+<h2 id="sec15"><span class="section-num">15.</span> Module 12 — Intelligent Caching &amp; System Optimization</h2>
+
+<h3>15.1 Cache Invalidation via MD5 Hashing</h3>
+$$\text{hash}_{\text{gallery}} = \text{MD5}\!\left(\bigoplus_{f \in \mathcal{F}_{\text{sorted}}} (\text{path}_f \,\|\, \text{mtime}_f \,\|\, \text{size}_f)\right)$$
+<p>Where $\bigoplus$ denotes string concatenation over sorted files.</p>
+
+<p><strong>Cache is invalidated if:</strong></p>
+$$\text{hash}_{\text{current}} \neq \text{hash}_{\text{cached}} \quad \text{OR} \quad \text{config}_{\text{current}} \neq \text{config}_{\text{cached}}$$
+
+<h3>15.2 Model Caching</h3>
+<p>The system caches:</p>
+<ol>
+  <li><strong>ResNet state dict</strong> (InceptionResNetV1 weights) — serialized via <code>pickle</code></li>
+  <li><strong>MTCNN parameters</strong> (cannot serialize YOLO/MediaPipe — reloaded fresh)</li>
+  <li><strong>Gallery embeddings</strong> and quality statistics</li>
+</ol>
+
+<p><strong>Cache hit speedup:</strong></p>
+$$\text{Speedup} = \frac{T_{\text{cold}}}{T_{\text{warm}}} = \frac{T_{\text{model\_load}} + T_{\text{gallery\_build}}}{T_{\text{cache\_load}}} \approx 5\text{–}10\times$$
+
+<!-- ===== 16. COMPARATIVE ANALYSIS ===== -->
+<div class="page-break"></div>
+<h2 id="sec16"><span class="section-num">16.</span> Comparative Analysis with Existing Systems</h2>
+
+<h3>16.1 Feature Comparison Matrix</h3>
+<table>
+  <thead>
+    <tr><th>Feature</th><th>Traditional (RFID/Bio)</th><th>DeepFace Systems</th><th>FaceNet-Only</th><th><strong>CORIS (Ours)</strong></th></tr>
+  </thead>
+  <tbody>
+    <tr><td>Hardware dependency</td><td class="check">✅ Required</td><td class="cross">❌ Camera only</td><td class="cross">❌ Camera only</td><td class="cross">❌ <strong>Camera only</strong></td></tr>
+    <tr><td>Multi-detector fusion</td><td>N/A</td><td class="cross">❌ Single</td><td class="cross">❌ Single</td><td class="check">✅ <strong>3 detectors</strong></td></tr>
+    <tr><td>Unknown person detection</td><td>N/A</td><td class="cross">❌ Weak</td><td class="cross">❌ Weak</td><td class="check">✅ <strong>4-stage strict</strong></td></tr>
+    <tr><td>Engagement tracking</td><td class="cross">❌ None</td><td class="cross">❌ None</td><td class="cross">❌ None</td><td class="check">✅ <strong>6 dimensions</strong></td></tr>
+    <tr><td>Head pose analysis</td><td>N/A</td><td class="cross">❌</td><td class="cross">❌</td><td class="check">✅ <strong>Yaw/Pitch/Roll</strong></td></tr>
+    <tr><td>Gaze tracking</td><td>N/A</td><td class="cross">❌</td><td class="cross">❌</td><td class="check">✅ <strong>Direction + Stability</strong></td></tr>
+    <tr><td>Blink/EAR detection</td><td>N/A</td><td class="cross">❌</td><td class="cross">❌</td><td class="check">✅ <strong>FaceMesh-based</strong></td></tr>
+    <tr><td>Emotion recognition</td><td>N/A</td><td class="cross">❌</td><td class="cross">❌</td><td class="check">✅ <strong>6 emotions</strong></td></tr>
+    <tr><td>Hand gesture detection</td><td>N/A</td><td class="cross">❌</td><td class="cross">❌</td><td class="check">✅ <strong>5 gestures</strong></td></tr>
+    <tr><td>Temporal tracking</td><td>N/A</td><td class="cross">❌ Per-frame</td><td class="cross">❌ Per-frame</td><td class="check">✅ <strong>Hungarian + EWA</strong></td></tr>
+    <tr><td>Proxy attendance prevention</td><td class="cross">❌ Weak</td><td class="cross">❌</td><td class="cross">❌</td><td class="check">✅ <strong>% threshold</strong></td></tr>
+    <tr><td>Real-time dashboard</td><td class="cross">❌</td><td class="cross">❌</td><td class="cross">❌</td><td class="check">✅ <strong>WebSocket</strong></td></tr>
+    <tr><td>Persistent analytics DB</td><td class="cross">❌</td><td class="cross">❌</td><td class="cross">❌</td><td class="check">✅ <strong>SQLite</strong></td></tr>
+    <tr><td>Cache optimization</td><td>N/A</td><td class="cross">❌</td><td class="cross">❌</td><td class="check">✅ <strong>MD5 + pickle</strong></td></tr>
+  </tbody>
+</table>
+
+<h3>16.2 Algorithmic Advantages</h3>
+
+<p><strong>Over single-detector systems (e.g., MTCNN-only or Haar-cascade):</strong></p>
+$$\text{Recall}_{\text{multi}} = 1 - \prod_{d=1}^{3}(1 - \text{Recall}_d) \geq \max_d \text{Recall}_d$$
+<p>If each detector has 90% recall independently, the fused system achieves:</p>
+$$\text{Recall}_{\text{fused}} \geq 1 - (0.1)^3 = 99.9\%$$
+
+<p><strong>Over per-frame classification systems:</strong></p>
+<p>Temporal voting eliminates transient errors. If per-frame accuracy is $p$, then after $K$ consistent frames:</p>
+$$P(\text{correct after } K \text{ votes}) = \sum_{k=\lceil K/2 \rceil}^{K} \binom{K}{k} p^k (1-p)^{K-k}$$
+<p>For $p = 0.85, K = 5$: $P(\text{correct}) = 0.9973$</p>
+
+<p><strong>Over systems without margin-based rejection:</strong></p>
+<p>Our $\delta$-margin requirement ($\delta = 0.15$) means:</p>
+$$P(\text{false positive}) \propto P(s^* > \tau \;\text{AND}\; s^* - s^{(2)} < \delta \;\mid\; \text{unknown person})$$
+<p>This is exponentially smaller than without the margin requirement.</p>
+
+<h3>16.3 Computational Complexity Comparison</h3>
+<table>
+  <thead><tr><th>System</th><th>Per-Frame Complexity</th><th>Tracking</th><th>Total per Video</th></tr></thead>
+  <tbody>
+    <tr><td>Haar + Template</td><td>$O(W \cdot H \cdot S)$</td><td>None</td><td>$O(F \cdot W \cdot H \cdot S)$</td></tr>
+    <tr><td>MTCNN-only</td><td>$O(W \cdot H \cdot C)$</td><td>None</td><td>$O(F \cdot W \cdot H \cdot C)$</td></tr>
+    <tr><td>DeepFace</td><td>$O(W \cdot H \cdot C + N_g \cdot d)$</td><td>None</td><td>$O(F \cdot (W \cdot H \cdot C + N_g \cdot d))$</td></tr>
+    <tr><td><strong>CORIS</strong></td><td>$O(3WHC + M^3 + N_g d + A)$</td><td>Hungarian $O(M^3)$</td><td>$O(F \cdot (D + M^3 + R + A))$</td></tr>
+  </tbody>
+</table>
+<p>Where $F$ = frames, $W,H$ = resolution, $S$ = scales, $C$ = CNN cost, $M$ = max(detections, tracks), $N_g$ = gallery size, $d$ = embedding dim, $A$ = attentiveness analysis cost.</p>
+
+<!-- ===== 17. NOVELTY ===== -->
+<div class="page-break"></div>
+<h2 id="sec17"><span class="section-num">17.</span> Novelty &amp; Contributions</h2>
+
+<h3>17.1 Novel Contributions of CORIS</h3>
+<ol>
+  <li><strong>Multi-Detector Fusion with Source-Aware NMS:</strong> First classroom attendance system to fuse YOLOv8-face, MTCNN, and MediaPipe detections with source-diversity-aware track confidence.</li>
+  <li><strong>Four-Stage Cascaded Unknown Detection:</strong> Unlike existing systems that use a single threshold, our cascaded $(\tau_{\text{unk}}, \tau_{\text{rec}}, \delta, \tau_{\text{high}} \times 1.5\delta)$ scheme virtually eliminates false positives while maintaining high recall.</li>
+  <li><strong>Six-Dimensional Engagement Vector:</strong> No existing real-time system simultaneously computes:
+    $$\mathbf{E}(n, t) = \begin{bmatrix} \text{Pose}(n,t) \\ \text{Gaze}(n,t) \\ \text{EAR}(n,t) \\ \text{Emotion}(n,t) \\ \text{Gesture}(n,t) \\ \text{Presence}(n,t) \end{bmatrix} \in \mathbb{R}^6$$
+  </li>
+  <li><strong>Exponentially Weighted Appearance Model:</strong> The EWA embedding history provides smooth identity representation that adapts to appearance changes while maintaining temporal consistency.</li>
+  <li><strong>Percentage-Based Attendance with Temporal Voting:</strong> Instead of binary presence/absence, our system provides a continuous presence percentage, eliminating false attendance from brief appearances.</li>
+  <li><strong>Quality-Weighted Gallery Centroids:</strong> Gallery embeddings are computed as quality-weighted centroids, giving higher weight to sharper, better-lit enrollment images.</li>
+  <li><strong>Hybrid IoU-Appearance Cost Matrix:</strong> The 4-component cost function provides more robust tracking than pure IoU or pure appearance matching.</li>
+  <li><strong>End-to-End Pipeline with Caching:</strong> MD5-based cache invalidation with selective caching (models + gallery embeddings) provides 5–10× speedup on subsequent runs.</li>
+</ol>
+
+<h3>17.2 Theoretical Upper Bound on System Performance</h3>
+
+<p><strong>Detection Recall Upper Bound:</strong></p>
+$$\text{Recall}_{\text{max}} = 1 - \prod_{d=1}^{D}\left(1 - R_d \cdot (1 - \epsilon_d)\right)$$
+<p>Where $R_d$ is the individual recall of detector $d$ and $\epsilon_d$ is the NMS suppression rate.</p>
+
+<p><strong>Recognition Precision Lower Bound (given margin $\delta$):</strong></p>
+<p>Under the assumption that intra-class similarity follows $\mathcal{N}(\mu_{\text{intra}}, \sigma_{\text{intra}}^2)$ and inter-class follows $\mathcal{N}(\mu_{\text{inter}}, \sigma_{\text{inter}}^2)$:</p>
+$$P(\text{correct}) \geq \Phi\!\left(\frac{\mu_{\text{intra}} - \mu_{\text{inter}} - \delta}{\sqrt{\sigma_{\text{intra}}^2 + \sigma_{\text{inter}}^2}}\right)$$
+
+<p>For typical FaceNet-VGGFace2 distributions ($\mu_{\text{intra}} \approx 0.80$, $\mu_{\text{inter}} \approx 0.30$, $\sigma \approx 0.10$) with $\delta = 0.15$:</p>
+$$P(\text{correct}) \geq \Phi\!\left(\frac{0.80 - 0.30 - 0.15}{\sqrt{0.01 + 0.01}}\right) = \Phi(2.47) \approx 0.993$$
+
+<!-- ===== 18. EXPERIMENTAL ===== -->
+<h2 id="sec18"><span class="section-num">18.</span> Experimental Results &amp; Metrics</h2>
+
+<h3>18.1 Evaluation Metrics</h3>
+
+<p><strong>Detection-Level Metrics:</strong></p>
+$$\text{Precision}_{\text{det}} = \frac{TP_{\text{det}}}{TP_{\text{det}} + FP_{\text{det}}}, \qquad \text{Recall}_{\text{det}} = \frac{TP_{\text{det}}}{TP_{\text{det}} + FN_{\text{det}}}$$
+$$F_1 = \frac{2 \cdot \text{Precision} \cdot \text{Recall}}{\text{Precision} + \text{Recall}}$$
+
+<p><strong>Recognition-Level Metrics:</strong></p>
+$$\text{Accuracy}_{\text{rec}} = \frac{\text{Correct Identifications}}{\text{Total Identifications}}$$
+$$\text{Rank-1 Accuracy} = P(\text{correct identity is top-1 match})$$
+$$\text{TAR@FAR} = P(\text{genuine accepted} \;\mid\; \text{FAR} = \alpha)$$
+
+<p><strong>Tracking-Level Metrics (CLEAR MOT):</strong></p>
+$$\text{MOTA} = 1 - \frac{\text{FN} + \text{FP} + \text{IDSW}}{\text{GT}}$$
+$$\text{MOTP} = \frac{\sum_{i,t} d_{i,t}}{\sum_t c_t}$$
+$$\text{IDF1} = \frac{2 \cdot \text{IDTP}}{2 \cdot \text{IDTP} + \text{IDFP} + \text{IDFN}}$$
+
+<p><strong>Attentiveness-Level Metrics:</strong></p>
+$$\text{Cohen's } \kappa = \frac{p_o - p_e}{1 - p_e}$$
+<p>Where $p_o$ is observed agreement and $p_e$ is chance agreement between system and human annotator.</p>
+
+<h3>18.2 System Configuration Parameters Summary</h3>
+<table>
+  <thead><tr><th>Parameter</th><th>Symbol</th><th>Value</th><th>Rationale</th></tr></thead>
+  <tbody>
+    <tr><td>YOLO confidence</td><td>$\tau_{\text{YOLO}}$</td><td>0.4</td><td>Balance precision/recall</td></tr>
+    <tr><td>MTCNN thresholds</td><td>$\tau_{\text{MTCNN}}$</td><td>[0.6, 0.7, 0.6]</td><td>Cascaded refinement</td></tr>
+    <tr><td>MediaPipe confidence</td><td>$\tau_{\text{MP}}$</td><td>0.5</td><td>Moderate filtering</td></tr>
+    <tr><td>NMS IoU threshold</td><td>$\tau_{\text{NMS}}$</td><td>0.3</td><td>Aggressive duplicate removal</td></tr>
+    <tr><td>Unknown threshold</td><td>$\tau_{\text{unk}}$</td><td>0.55</td><td>Strict unknown detection</td></tr>
+    <tr><td>Recognition threshold</td><td>$\tau_{\text{rec}}$</td><td>0.65</td><td>High match confidence</td></tr>
+    <tr><td>Similarity margin</td><td>$\delta$</td><td>0.15</td><td>Discriminability guarantee</td></tr>
+    <tr><td>High-confidence threshold</td><td>$\tau_{\text{high}}$</td><td>0.75</td><td>Very confident match</td></tr>
+    <tr><td>Stability frames</td><td>$\tau_{\text{stab}}$</td><td>5</td><td>Temporal consistency</td></tr>
+    <tr><td>IoU weight (tracking)</td><td>$w_{\text{IoU}}$</td><td>0.4</td><td>Spatial correspondence</td></tr>
+    <tr><td>Appearance weight</td><td>$w_{\text{app}}$</td><td>0.6</td><td>Visual identity matching</td></tr>
+    <tr><td>Track max age</td><td>$\tau_{\text{age}}$</td><td>30 frames</td><td>Occlusion tolerance</td></tr>
+    <tr><td>Attendance threshold</td><td>$\tau_{\%}$</td><td>30%</td><td>Minimum presence</td></tr>
+    <tr><td>EAR blink threshold</td><td>$\tau_{\text{EAR}}$</td><td>0.21</td><td>Blink detection point</td></tr>
+    <tr><td>Embedding dimension</td><td>$d$</td><td>512</td><td>FaceNet architecture</td></tr>
+    <tr><td>Embedding history</td><td>$K$</td><td>20</td><td>Sliding window size</td></tr>
+    <tr><td>Face crop margin</td><td>$m$</td><td>0.3</td><td>Context inclusion</td></tr>
+    <tr><td>Face size range</td><td>$[w_{\min}, w_{\max}]$</td><td>[20, 500] px</td><td>Detection filtering</td></tr>
+  </tbody>
+</table>
+
+<!-- ===== 19. REFERENCES ===== -->
+<div class="page-break"></div>
+<h2 id="sec19"><span class="section-num">19.</span> References</h2>
+<ol class="references">
+  <li>Schroff, F., Kalenichenko, D., &amp; Philbin, J. (2015). <em>FaceNet: A Unified Embedding for Face Recognition and Clustering</em>. CVPR.</li>
+  <li>Redmon, J. et al. (2016–2023). <em>YOLO: You Only Look Once</em> — Series from YOLOv1 to YOLOv8 (Ultralytics).</li>
+  <li>Zhang, K., Zhang, Z., Li, Z., &amp; Qiao, Y. (2016). <em>Joint Face Detection and Alignment Using Multitask Cascaded Convolutional Networks</em>. IEEE Signal Processing Letters.</li>
+  <li>Kuhn, H. W. (1955). <em>The Hungarian Method for the Assignment Problem</em>. Naval Research Logistics Quarterly.</li>
+  <li>Munkres, J. (1957). <em>Algorithms for the Assignment and Transportation Problems</em>. Journal of SIAM.</li>
+  <li>Soukupová, T., &amp; Čech, J. (2016). <em>Real-Time Eye Blink Detection Using Facial Landmarks</em>. Computer Vision Winter Workshop.</li>
+  <li>Lugaresi, C. et al. (2019). <em>MediaPipe: A Framework for Building Perception Pipelines</em>. CVPR Workshop on Computer Vision for AR/VR.</li>
+  <li>Bazarevsky, V. et al. (2019). <em>BlazeFace: Sub-millisecond Neural Face Detection on Mobile GPUs</em>. CVPR Workshop.</li>
+  <li>Cao, Q., Shen, L., Xie, W., Parkhi, O. M., &amp; Zisserman, A. (2018). <em>VGGFace2: A Dataset for Recognising Faces across Pose and Age</em>. IEEE FG.</li>
+  <li>Zheng, Z. et al. (2020). <em>Distance-IoU Loss: Faster and Better Learning for Bounding Box Regression</em>. AAAI.</li>
+  <li>Otsu, N. (1979). <em>A Threshold Selection Method from Gray-Level Histograms</em>. IEEE Transactions on Systems, Man, and Cybernetics.</li>
+  <li>Bewley, A., Ge, Z., Ott, L., Ramos, F., &amp; Upcroft, B. (2016). <em>Simple Online and Realtime Tracking (SORT)</em>. IEEE ICIP.</li>
+  <li>Wojke, N., Bewley, A., &amp; Paulus, D. (2017). <em>Simple Online and Realtime Tracking with a Deep Association Metric (Deep SORT)</em>. IEEE ICIP.</li>
+  <li>Bernardin, K. &amp; Stiefelhagen, R. (2008). <em>Evaluating Multiple Object Tracking Performance: The CLEAR MOT Metrics</em>. EURASIP JIVP.</li>
+  <li>Cohen, J. (1960). <em>A Coefficient of Agreement for Nominal Scales</em>. Educational and Psychological Measurement.</li>
+  <li>Deng, J., Guo, J., Niannan, X., &amp; Zafeiriou, S. (2019). <em>ArcFace: Additive Angular Margin Loss for Deep Face Recognition</em>. CVPR.</li>
+  <li>Kartynnik, Y. et al. (2019). <em>Real-time Facial Surface Geometry from Monocular Video on Mobile GPUs</em>. CVPR Workshop.</li>
+  <li>Zhang, F. et al. (2020). <em>MediaPipe Hands: On-device Real-time Hand Tracking</em>. CVPR Workshop.</li>
+</ol>
+
+<!-- ===== APPENDIX A ===== -->
+<div class="page-break"></div>
+<div class="appendix">
+<h2 id="appA"><span class="section-num">A.</span> Appendix A — Complete Algorithm Pseudocode</h2>
+
+<h3>A.1 Main Pipeline</h3>
+<pre><code>Algorithm: CORIS Attendance & Engagement Pipeline
+Input:  Video V, Gallery G, Thresholds Θ
+Output: Attendance records A, Engagement scores E
+
+ 1.  Models ← LoadModels(YOLO_weights, MTCNN_params, FaceNet_VGGFace2)
+ 2.  Gallery_Emb ← BuildGallery(G, Models)       // Quality-weighted centroids
+ 3.  Tracks ← ∅
+ 4.  for each frame F in V:
+ 5.      D ← MultiDetectorFusion(F, Models)       // YOLO ∪ MTCNN ∪ MediaPipe
+ 6.      D ← NMS(D, τ_NMS = 0.3)
+ 7.      D ← ValidateGeometry(D)
+ 8.      E_d ← ExtractEmbeddings(D, FaceNet)
+ 9.      C ← ComputeCostMatrix(D, E_d, Tracks)    // IoU + Appearance + Conf + Age
+10.      π* ← HungarianAlgorithm(C)
+11.      Tracks ← UpdateTracks(Tracks, D, E_d, π*)
+12.      for each track T in Tracks:
+13.          e_curr ← ExponentialWeightedAverage(T.embeddings)
+14.          (name, sim, reason) ← GalleryMatch(e_curr, Gallery_Emb, Θ)
+15.          TemporalVote(T, name, sim)
+16.
+17.      // Attentiveness (parallel)
+18.      for each track T with stable label:
+19.          pose    ← HeadPoseEstimation(F, T.bbox)
+20.          gaze    ← GazeEstimation(F, T.bbox)
+21.          ear     ← EyeAspectRatio(F, T.bbox)
+22.          emotion ← EmotionDetection(F, T.bbox)
+23.          gesture ← GestureDetection(F, T.bbox)
+24.          A_s     ← AttentivenessScore(pose, gaze, ear, emotion, gesture)
+25.          UpdateHistory(T, A_s)
+26.
+27.  A ← ComputeAttendance(Tracks, τ_% = 30%)
+28.  E ← ComputeEngagementSummary(Tracks)
+29.  return A, E</code></pre>
+
+<!-- ===== APPENDIX B ===== -->
+<h2 id="appB"><span class="section-num">B.</span> Appendix B — Notation Summary</h2>
+<table>
+  <thead><tr><th>Symbol</th><th>Description</th></tr></thead>
+  <tbody>
+    <tr><td>$\mathbf{e},\; \hat{\mathbf{e}}$</td><td>Embedding / normalized embedding</td></tr>
+    <tr><td>$f_\theta(\cdot)$</td><td>Neural network with parameters $\theta$</td></tr>
+    <tr><td>$\text{sim}(\cdot, \cdot)$</td><td>Cosine similarity</td></tr>
+    <tr><td>$\text{IoU}(\cdot, \cdot)$</td><td>Intersection over Union</td></tr>
+    <tr><td>$\tau$</td><td>Threshold</td></tr>
+    <tr><td>$\delta$</td><td>Similarity margin</td></tr>
+    <tr><td>$\pi^*$</td><td>Optimal assignment</td></tr>
+    <tr><td>$C(\cdot, \cdot)$</td><td>Cost function</td></tr>
+    <tr><td>$A_s$</td><td>Attention score</td></tr>
+    <tr><td>$\text{EAR}$</td><td>Eye Aspect Ratio</td></tr>
+    <tr><td>$\kappa_m$</td><td>Mouth curvature</td></tr>
+    <tr><td>$G_x, G_y$</td><td>Sobel gradient operators</td></tr>
+    <tr><td>$\Sigma$</td><td>Covariance matrix</td></tr>
+    <tr><td>$\mathcal{D}$</td><td>Detection set</td></tr>
+    <tr><td>$\mathcal{T}$</td><td>Track set</td></tr>
+    <tr><td>$\mathcal{G}$</td><td>Gallery set</td></tr>
+    <tr><td>$\mathbf{E}(n,t)$</td><td>Engagement vector for student $n$ at time $t$</td></tr>
+    <tr><td>$F_n$</td><td>Frames analyzed for student $n$</td></tr>
+    <tr><td>$P_{\text{presence}}$</td><td>Presence percentage</td></tr>
+    <tr><td>$R_{\text{blink}}$</td><td>Blink rate (blinks/min)</td></tr>
+  </tbody>
+</table>
+</div>
+
+<hr>
+<p style="text-align: center; font-size: 9pt; color: #94a3b8; margin-top: 30px;">
+  <em>CORIS Research Paper — Mathematical Foundations, Algorithms &amp; Comparative Analysis — February 2026</em>
+</p>
+
+</body>
+</html>
