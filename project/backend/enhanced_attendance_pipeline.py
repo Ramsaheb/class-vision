@@ -11,6 +11,8 @@ from typing import Dict, List, Tuple, Optional
 import json
 from datetime import datetime
 
+ENHANCED_YOLO_CONF = float(os.getenv('ENHANCED_YOLO_CONF', '0.30'))
+
 # Import the original attendance pipeline
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
 from attendance_pipeline import (
@@ -361,7 +363,7 @@ class EnhancedAttendancePipeline:
         
         # Detect faces using YOLOv8
         if yolo_face is not None:
-            results = yolo_face(frame, conf=0.4, verbose=False)
+            results = yolo_face(frame, conf=ENHANCED_YOLO_CONF, verbose=False)
             for r in results:
                 for box in r.boxes:
                     x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
@@ -407,6 +409,12 @@ class EnhancedAttendancePipeline:
                 if best_name and best_sim > 0.4:
                     detections.append({
                         'id': best_name,
+                        'bbox': [x1, y1, x2, y2]
+                    })
+                else:
+                    # Keep unmatched faces visible in output video to avoid missing boxes.
+                    detections.append({
+                        'id': 'Unknown',
                         'bbox': [x1, y1, x2, y2]
                     })
             except Exception:
@@ -745,6 +753,11 @@ class EnhancedAttendancePipeline:
             student_name = detection['id']
             bbox = detection['bbox']
             x1, y1, x2, y2 = bbox
+
+            if student_name == 'Unknown':
+                cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), (128, 128, 128), 1)
+                cv2.putText(annotated_frame, "Unknown", (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (128, 128, 128), 1)
+                continue
             
             # Get attendance status
             att_data = attendance_map.get(student_name, {})
@@ -759,9 +772,9 @@ class EnhancedAttendancePipeline:
             # Draw basic bounding box for attendance
             cv2.rectangle(annotated_frame, (x1, y1), (x2, y2), color, 1)
             
-            # Add attendance label
-            status = "Present" if is_present else "Absent"
-            cv2.putText(annotated_frame, f"{student_name}: {status}", 
+            # Compact label for cleaner display in crowded scenes.
+            status = "P" if is_present else "A"
+            cv2.putText(annotated_frame, f"{student_name} [{status}]", 
                        (x1, y1 - 5), cv2.FONT_HERSHEY_SIMPLEX, 0.5, color, 1)
         
         return annotated_frame

@@ -341,6 +341,9 @@ async def process_attendance_async(req: RunRequest):
         
         # Export data snapshot for offline frontend
         export_data_snapshot(enhanced_result)
+
+        # Auto-send emails to defaulters after successful session completion
+        trigger_auto_defaulter_emails(enhanced_result)
         
         # Broadcast completion
         await app_state.broadcast_status({
@@ -457,6 +460,9 @@ async def process_enhanced_attendance_async(req: EnhancedRunRequest):
         
         # Export data snapshot for offline frontend
         export_data_snapshot(enhanced_result)
+
+        # Auto-send emails to defaulters after successful session completion
+        trigger_auto_defaulter_emails(enhanced_result)
         
         await app_state.broadcast_status({
             "is_processing": False, 
@@ -1323,22 +1329,24 @@ def delete_all_sessions():
 # Or the defaults below will be used.
 SENDER_EMAIL = os.environ.get("CORIS_SENDER_EMAIL", "coris.attendance.system@gmail.com")
 SENDER_PASS = os.environ.get("CORIS_SENDER_PASS", "")
+AUTO_SEND_DEFAULTER_EMAILS = os.environ.get("AUTO_SEND_DEFAULTER_EMAILS", "1").strip().lower() in ("1", "true", "yes", "on")
+DEFAULTER_ATTENDANCE_THRESHOLD = float(os.environ.get("DEFAULTER_ATTENDANCE_THRESHOLD", "60"))
+MIN_SESSIONS_FOR_DEFAULTER = int(os.environ.get("MIN_SESSIONS_FOR_DEFAULTER", "2"))
+PRESENT_PCT_THRESHOLD = float(os.environ.get("PRESENT_PCT_THRESHOLD", "30"))
+PRESENT_SEC_THRESHOLD = float(os.environ.get("PRESENT_SEC_THRESHOLD", "10"))
 
-class EmailRequest(BaseModel):
-    student_names: List[str]
-    subject: str
-    body: str
 
-@app.post("/send-defaulter-emails")
-def send_defaulter_emails(req: EmailRequest):
-    """Send attendance alert emails to defaulter students"""
+def _send_email_to_students(student_names: List[str], subject: str, body: str) -> Dict[str, Any]:
+    """Shared SMTP sender used by API and auto-defaulter workflow."""
     if not DATABASE_AVAILABLE:
         return {"error": "Database not available"}
+    if not student_names:
+        return {"error": "No students provided"}
     if not SENDER_PASS:
         return {"error": "Email not configured. Set CORIS_SENDER_EMAIL and CORIS_SENDER_PASS environment variables."}
 
     try:
-        emails = db.get_student_emails(req.student_names)
+        emails = db.get_student_emails(student_names)
         if not emails:
             return {"error": "No email addresses found for selected students"}
 
@@ -1354,8 +1362,8 @@ def send_defaulter_emails(req: EmailRequest):
                 msg = MIMEMultipart()
                 msg["From"] = SENDER_EMAIL
                 msg["To"] = email_addr
-                msg["Subject"] = req.subject
-                msg.attach(MIMEText(req.body, "plain"))
+                msg["Subject"] = subject
+                msg.attach(MIMEText(body, "plain"))
                 server.sendmail(SENDER_EMAIL, email_addr, msg.as_string())
                 sent.append({"name": name, "email": email_addr})
             except Exception as e:
@@ -1374,6 +1382,81 @@ def send_defaulter_emails(req: EmailRequest):
         return {"error": "Email authentication failed. Check CORIS_SENDER_EMAIL and CORIS_SENDER_PASS."}
     except Exception as e:
         return {"error": f"Failed to send emails: {str(e)}"}
+
+
+def _get_auto_defaulters(latest_result: Optional[Dict[str, Any]] = None) -> List[Dict[str, Any]]:
+    """Select current defaulters from DB using the same threshold policy as frontend."""
+    insights = db.get_all_student_insights()
+    students = insights.get("students", [])
+
+    present_now = set()
+    attendance = (latest_result or {}).get("attendance", {})
+    for name, rec in attendance.items():
+        try:
+            pct = float((rec or {}).get("presence_percentage", 0) or 0)
+            sec = float((rec or {}).get("presence_seconds", 0) or 0)
+            if pct >= PRESENT_PCT_THRESHOLD or sec >= PRESENT_SEC_THRESHOLD:
+                present_now.add(str(name).strip().lower())
+        except Exception:
+            continue
+
+    defaulters = []
+    for s in students:
+        total_sessions = int(s.get("total_sessions", 0) or 0)
+        attendance_rate = float(s.get("attendance_rate", 0) or 0)
+        name = str(s.get("name", "")).strip()
+        if not name:
+            continue
+
+        if total_sessions >= MIN_SESSIONS_FOR_DEFAULTER and attendance_rate < DEFAULTER_ATTENDANCE_THRESHOLD:
+            if name.lower() not in present_now:
+                defaulters.append(s)
+
+    return defaulters
+
+
+def trigger_auto_defaulter_emails(latest_result: Optional[Dict[str, Any]] = None):
+    """Auto-email all current defaulters after each completed run."""
+    if not AUTO_SEND_DEFAULTER_EMAILS:
+        return
+    if not DATABASE_AVAILABLE:
+        return
+
+    defaulters = _get_auto_defaulters(latest_result)
+    if not defaulters:
+        print("📧 Auto-email: no current defaulters")
+        return
+
+    names = [str(s.get("name", "")).strip() for s in defaulters if str(s.get("name", "")).strip()]
+    if not names:
+        return
+
+    subject = "Attendance Alert - Immediate Attention Required"
+    details = "\n".join([f"- {s['name']} ({float(s.get('attendance_rate', 0) or 0):.1f}%)" for s in defaulters])
+    body = (
+        "Dear Parent/Guardian,\n\n"
+        f"This is to inform you that the student attendance is below the required {DEFAULTER_ATTENDANCE_THRESHOLD:.0f}% threshold:\n\n"
+        f"{details}\n\n"
+        "Please ensure regular attendance to avoid academic consequences.\n\n"
+        "Regards,\n"
+        "Attendance Monitoring System"
+    )
+
+    result = _send_email_to_students(names, subject, body)
+    if result.get("error"):
+        print(f"⚠️ Auto-email failed: {result['error']}")
+    else:
+        print(f"📧 Auto-email sent: {result.get('total_sent', 0)} sent, {result.get('total_failed', 0)} failed")
+
+class EmailRequest(BaseModel):
+    student_names: List[str]
+    subject: str
+    body: str
+
+@app.post("/send-defaulter-emails")
+def send_defaulter_emails(req: EmailRequest):
+    """Send attendance alert emails to defaulter students"""
+    return _send_email_to_students(req.student_names, req.subject, req.body)
 
 @app.get("/student-emails")
 def get_student_emails():
