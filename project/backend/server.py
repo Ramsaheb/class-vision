@@ -8,6 +8,10 @@ import shutil
 import json
 import asyncio
 import time
+import traceback
+import smtplib
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
 from datetime import datetime
 import cv2
 
@@ -106,8 +110,8 @@ class AppState:
 
 app_state = AppState()
 
-# Auto-start flag - set to True to automatically start processing on server startup
-AUTO_START_PROCESSING = True
+# Auto-start flag - keep disabled to avoid hidden startup runs during debugging.
+AUTO_START_PROCESSING = False
 
 @app.on_event("startup")
 async def startup_event():
@@ -119,6 +123,32 @@ async def startup_event():
             print("\u2705 Students synced from gallery to database on startup")
         except Exception as e:
             print(f"\u26a0\ufe0f Gallery sync on startup failed: {e}")
+        try:
+            stale, orphans = db.cleanup_on_startup()
+            if stale or orphans:
+                print(f"\U0001f9f9 Cleanup: {stale} stale sessions marked failed, {orphans} orphan records removed")
+        except Exception as e:
+            print(f"\u26a0\ufe0f DB cleanup on startup failed: {e}")
+        
+        # Export existing database data to JSON files so offline pages work
+        try:
+            export_data_snapshot(None)  # Export from database
+            print("\u2705 Database data exported to JSON files for offline support")
+        except Exception as e:
+            print(f"\u26a0\ufe0f Data export failed: {e}")
+
+    # Restore last_result from disk so LiveAnalytics works immediately
+    if app_state.last_result is None:
+        for fname in ("enhanced_last_result.json", "last_result.json"):
+            fpath = os.path.join(PROJECT_ROOT, fname)
+            if os.path.isfile(fpath):
+                try:
+                    with open(fpath, 'r', encoding='utf-8') as f:
+                        app_state.last_result = json.load(f)
+                    print(f"\u2705 Restored last_result from {fname}")
+                    break
+                except Exception as e:
+                    print(f"\u26a0\ufe0f Failed to restore {fname}: {e}")
 
     if AUTO_START_PROCESSING:
         print("🚀 Server started! Auto-starting attendance processing...")
@@ -152,6 +182,17 @@ async def shutdown_event():
 @app.get("/health")
 def health():
     return {"status": "ok", "cache_info": app_state.cache.get_cache_info()}
+
+@app.post("/export-data")
+def export_data_endpoint():
+    """Export all database data to static JSON files for offline use"""
+    if not DATABASE_AVAILABLE:
+        return {"error": "Database not available"}
+    try:
+        export_data_snapshot(app_state.last_result)
+        return {"status": "success", "message": "Data exported to JSON files for offline use"}
+    except Exception as e:
+        return {"error": str(e)}
 
 @app.get("/test-data")
 def test_data():
@@ -224,15 +265,33 @@ async def run(req: RunRequest):
 async def process_attendance_async(req: RunRequest):
     """Process attendance in background with real-time status updates"""
     try:
+        # Auto-use enhanced pipeline if available for attention tracking
+        if ENHANCED_AVAILABLE:
+            enhanced_req = EnhancedRunRequest(
+                gallery_dir=req.gallery_dir,
+                video_path=req.video_path,
+                output_video=req.output_video,
+                use_cache=req.use_cache,
+                clear_cache=req.clear_cache,
+                enable_attentiveness=True,
+                enable_pose=True,
+                enable_gaze=True
+            )
+            await process_enhanced_attendance_async(enhanced_req)
+            return
+
+        main_loop = asyncio.get_running_loop()
+
         def progress_callback(percent, message):
-            """Sync progress callback that schedules async broadcast"""
-            loop = asyncio.get_event_loop()
-            if loop.is_running():
-                asyncio.create_task(app_state.broadcast_status({
-                    "is_processing": True,
-                    "progress": min(95, max(10, percent)),  # Keep between 10-95 during processing
-                    "message": message
-                }))
+            """Thread-safe progress callback that schedules async broadcast on the main loop."""
+            payload = {
+                "is_processing": True,
+                "progress": min(95, max(10, percent)),  # Keep between 10-95 during processing
+                "message": message
+            }
+            main_loop.call_soon_threadsafe(
+                lambda: asyncio.create_task(app_state.broadcast_status(payload))
+            )
         
         await app_state.broadcast_status({
             "is_processing": True, 
@@ -241,7 +300,8 @@ async def process_attendance_async(req: RunRequest):
         })
         
         # Run the actual processing with progress callback
-        result = run_attendance_cached(
+        result = await asyncio.to_thread(
+            run_attendance_cached,
             gallery_dir=req.gallery_dir or DEFAULT_GALLERY_DIR,
             video_path=req.video_path or DEFAULT_VIDEO_PATH,
             output_video=req.output_video or DEFAULT_OUTPUT_VIDEO,
@@ -287,6 +347,8 @@ async def process_attendance_async(req: RunRequest):
         await app_state.broadcast_result(enhanced_result)
         
     except Exception as e:
+        print(f"❌ process_attendance_async failed: {e}")
+        traceback.print_exc()
         await app_state.broadcast_status({
             "is_processing": False, 
             "progress": 0, 
@@ -337,6 +399,18 @@ async def process_enhanced_attendance_async(req: EnhancedRunRequest):
             "progress": 10, 
             "message": "Processing attendance and attentiveness..."
         })
+
+        main_loop = asyncio.get_running_loop()
+
+        def progress_callback(percent, message):
+            payload = {
+                "is_processing": True,
+                "progress": min(95, max(10, float(percent))),
+                "message": str(message)
+            }
+            main_loop.call_soon_threadsafe(
+                lambda: asyncio.create_task(app_state.broadcast_status(payload))
+            )
         
         # Create output paths
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -345,13 +419,21 @@ async def process_enhanced_attendance_async(req: EnhancedRunRequest):
         session_name = f"Enhanced_Session_{timestamp}"
         
         # Process video (save_results=False to skip CSV/JSON file generation; DB save is separate)
-        result = pipeline.process_video(
+        await app_state.broadcast_status({
+            "is_processing": True,
+            "progress": 20,
+            "message": "Running frame-wise face detection and attentiveness analysis..."
+        })
+
+        result = await asyncio.to_thread(
+            pipeline.process_video,
             video_path=req.video_path or DEFAULT_VIDEO_PATH,
             output_video_path=req.output_video,
             save_results=False,
             output_csv=output_csv,
             attention_output=attention_output,
-            session_name=session_name
+            session_name=session_name,
+            progress_callback=progress_callback
         )
         
         await app_state.broadcast_status({
@@ -365,6 +447,7 @@ async def process_enhanced_attendance_async(req: EnhancedRunRequest):
         
         # Cache result
         app_state.last_result = enhanced_result
+        save_result_to_file(enhanced_result)
         save_result_to_file(enhanced_result, "enhanced_last_result.json")
         
         # Export data snapshot for offline frontend
@@ -379,6 +462,8 @@ async def process_enhanced_attendance_async(req: EnhancedRunRequest):
         await app_state.broadcast_result(enhanced_result)
         
     except Exception as e:
+        print(f"❌ process_enhanced_attendance_async failed: {e}")
+        traceback.print_exc()
         await app_state.broadcast_status({
             "is_processing": False, 
             "progress": 0, 
@@ -556,56 +641,65 @@ def enhance_enhanced_result_for_frontend(result: Dict[str, Any], csv_path: str, 
     analyzed_students = sum(1 for s in student_summaries.values() if s["attentiveness"]["analyzed"])
     
     enhanced["summary"] = {
+        "total_people": total_students,
+        "present_people": present_students,
+        "absent_people": total_students - present_students,
+        "attendance_rate": (present_students / max(total_students, 1)) * 100,
         "total_students": total_students,
         "present_students": present_students,
         "absent_students": total_students - present_students,
-        "attendance_rate": (present_students / max(total_students, 1)) * 100,
         "attentiveness_analyzed": analyzed_students,
         "analysis_coverage": (analyzed_students / max(total_students, 1)) * 100
     }
     
-    # Process attentiveness statistics
-    if analyzed_students > 0:
-        total_attention_score = sum(s["attentiveness"]["avg_attention_score"] 
-                                  for s in student_summaries.values() 
-                                  if s["attentiveness"]["analyzed"])
-        avg_attention_score = total_attention_score / analyzed_students
-        
-        # Count attention states
-        attention_states = {"attentive": 0, "distracted": 0, "drowsy": 0, "sleeping": 0}
-        for student in student_summaries.values():
-            if student["attentiveness"]["analyzed"]:
-                distribution = student["attentiveness"]["attention_distribution"]
-                for state, time_spent in distribution.items():
-                    if state in attention_states and time_spent > 0:
-                        attention_states[state] += 1
-        
-        enhanced["attentiveness_summary"] = {
-            "average_attention_score": avg_attention_score,
-            "attention_state_counts": attention_states,
-            "highly_attentive_students": sum(1 for s in student_summaries.values() 
-                                           if s["attentiveness"]["analyzed"] and 
-                                              s["attentiveness"]["avg_attention_score"] > 0.7)
+    # Build attendance dict in the format the frontend expects
+    frontend_attendance = {}
+    for name, sdata in student_summaries.items():
+        att = sdata["attendance"]
+        frontend_attendance[name] = {
+            "presence_seconds": att.get("total_time", 0),
+            "presence_percentage": (att.get("total_time", 0) / max(1, 60)) * 100 if att.get("present") else 0,
+            "avg_confidence": att.get("confidence", 0),
+            "present": att.get("present", False),
+            "num_tracks": 1 if att.get("present") else 0,
+            "detection_sources": []
         }
-    else:
-        enhanced["attentiveness_summary"] = {
-            "average_attention_score": 0,
-            "attention_state_counts": {"attentive": 0, "distracted": 0, "drowsy": 0, "sleeping": 0},
-            "highly_attentive_students": 0
-        }
+    enhanced["attendance"] = frontend_attendance
+
+    # Build attentiveness dict with individual_scores for frontend
+    individual_scores = {}
+    total_attention = 0.0
+    attn_count = 0
+    for name, sdata in student_summaries.items():
+        attn = sdata["attentiveness"]
+        if attn.get("analyzed"):
+            score = attn.get("avg_attention_score", 0)
+            total_attention += score
+            attn_count += 1
+            
+            # Determine attention state
+            dist = attn.get("attention_distribution", {})
+            if dist:
+                state = max(dist, key=dist.get) if dist else "attentive"
+            else:
+                state = "attentive" if score >= 0.6 else "distracted"
+            
+            individual_scores[name] = {
+                "attention_pct": round(score * 100, 1),
+                "state": state,
+                "gaze_score": attn.get("gaze_stability_score", score * 0.85),
+                "emotion": attn.get("dominant_emotion", "neutral"),
+                "engagement_level": attn.get("engagement_level", "N/A"),
+                "blink_rate": attn.get("blink_rate", 0),
+                "head_movement": attn.get("head_movement_score", 0),
+            }
     
-    # Create chart data for frontend
-    enhanced["attendance_chart_data"] = [
-        {"name": "Present", "value": present_students, "color": "#10B981"},
-        {"name": "Absent", "value": total_students - present_students, "color": "#EF4444"}
-    ]
-    
-    enhanced["attention_chart_data"] = [
-        {"name": "Attentive", "value": enhanced["attentiveness_summary"]["attention_state_counts"]["attentive"], "color": "#10B981"},
-        {"name": "Distracted", "value": enhanced["attentiveness_summary"]["attention_state_counts"]["distracted"], "color": "#F59E0B"},
-        {"name": "Drowsy", "value": enhanced["attentiveness_summary"]["attention_state_counts"]["drowsy"], "color": "#F97316"},
-        {"name": "Sleeping", "value": enhanced["attentiveness_summary"]["attention_state_counts"]["sleeping"], "color": "#EF4444"}
-    ]
+    class_avg = (total_attention / attn_count * 100) if attn_count > 0 else 0
+    enhanced["attentiveness"] = {
+        "class_average": round(class_avg, 1),
+        "focus_score": round(class_avg * 0.9, 1),
+        "individual_scores": individual_scores
+    }
     
     return enhanced
 
@@ -624,50 +718,131 @@ def export_data_snapshot(last_result: Dict[str, Any] = None):
     
     Writes to frontend/public/data/ which Vite serves at /data/*.json.
     This covers every endpoint the frontend uses so it can run fully without the backend.
+    Priority: Database > last_result parameter > empty defaults
     """
     try:
         os.makedirs(FRONTEND_DATA_DIR, exist_ok=True)
+        print("📦 Starting data snapshot export...")
 
+        # Build student insights from database first, fallback to last_result
+        insights = None
         if DATABASE_AVAILABLE:
-            # 1. Student insights (used by Dashboard, Students, Defaulters)
-            insights = db.get_all_student_insights()
+            try:
+                insights = db.get_all_student_insights()
+                print(f"  ✓ Got {len(insights.get('students', []))} students from database")
+            except Exception as e:
+                print(f"  ⚠ Database insights failed: {e}")
+                insights = None
+        
+        # If database data unavailable, build from last_result
+        if not insights and last_result:
+            print("  Building insights from last_result...")
+            attendance = last_result.get('attendance', {})
+            students = []
+            for name, data in attendance.items():
+                students.append({
+                    'name': name,
+                    'total_sessions': 1,
+                    'total_present': 1 if data.get('present', False) else 0,
+                    'last_seen': None,
+                    'attendance_rate': 100.0 if data.get('present', False) else 0.0,
+                    'avg_attention_score': 0,
+                    'avg_attentiveness_pct': 0,
+                    'avg_presence_time': data.get('presence_seconds', 0),
+                    'best_attention_score': 0,
+                    'avg_gaze_stability': 0,
+                    'avg_blink_rate': 0,
+                    'avg_head_movement': 0,
+                    'total_participation_events': 0,
+                    'avg_participation_rate': 0
+                })
+            
+            sessions = []
+            summary = last_result.get('summary', {})
+            if summary.get('total_people', 0) > 0:
+                sessions.append({
+                    'id': 999,
+                    'name': f"Live_Session_{datetime.now().strftime('%Y%m%d_%H%M%S')}",
+                    'start_time': last_result.get('timestamp', datetime.now().isoformat()),
+                    'end_time': None,
+                    'duration_seconds': None,
+                    'total_students': summary.get('total_people', 0),
+                    'present_students': summary.get('present_people', 0),
+                    'absent_students': summary.get('absent_people', 0),
+                    'enhanced_analysis': False,
+                    'status': 'completed'
+                })
+            
+            insights = {
+                'overall': {
+                    'total_sessions': len(sessions),
+                    'total_students': len(students),
+                    'overall_attendance_rate': summary.get('attendance_rate', 0)
+                },
+                'students': students,
+                'sessions': sessions,
+                'trends': []
+            }
+            print(f"  Built insights for {len(students)} students from live data")
+        
+        # Export student insights if available
+        if insights:
             _write_snapshot('student-insights.json', {"data": insights})
-
-            # 2. Sessions list
             _write_snapshot('sessions.json', {"sessions": insights.get('sessions', [])})
+            
+            # Per-session and per-student details from DB
+            if DATABASE_AVAILABLE:
+                for session in insights.get('sessions', []):
+                    sid = session.get('id')
+                    if sid and sid != 999:  # Skip the synthetic session
+                        try:
+                            detail = db.get_session_details(sid)
+                            _write_snapshot(f'session-{sid}.json', detail)
+                        except Exception:
+                            pass
+                
+                for student in insights.get('students', []):
+                    name = student.get('name', '')
+                    if name:
+                        try:
+                            history = db.get_student_session_history(name)
+                            _write_snapshot(f'student-history-{name}.json', {"data": history})
+                        except Exception:
+                            pass
 
-            # 3. Per-session detail (used by Sessions page drill-down)
-            for session in insights.get('sessions', []):
-                sid = session.get('id')
-                if sid is not None:
-                    try:
-                        detail = db.get_session_details(sid)
-                        _write_snapshot(f'session-{sid}.json', detail)
-                    except Exception:
-                        pass
-
-            # 4. Per-student history (used by Students page drill-down)
-            for student in insights.get('students', []):
-                name = student.get('name', '')
-                if name:
-                    try:
-                        history = db.get_student_session_history(name)
-                        _write_snapshot(f'student-history-{name}.json', {"data": history})
-                    except Exception:
-                        pass
-
-            # 5. Dashboard data
+        # Export dashboard data
+        dashboard = None
+        if DATABASE_AVAILABLE:
             try:
                 dashboard = db.get_dashboard_data()
-                _write_snapshot('dashboard-data.json', {"data": dashboard, "cached": False})
-            except Exception:
-                pass
+            except Exception as e:
+                print(f"  ⚠ Dashboard data failed: {e}")
+        
+        if not dashboard and insights:
+            # Build dashboard from insights
+            students = insights.get('students', [])
+            total_present = sum(s.get('total_present', 0) for s in students)
+            total_sessions = insights.get('overall', {}).get('total_sessions', 0)
+            dashboard = {
+                'statistics': {
+                    'total_sessions': total_sessions,
+                    'total_students': len(students),
+                    'avg_attention': insights.get('overall', {}).get('overall_attendance_rate', 0),
+                    'total_present': total_present,
+                    'total_absent': sum(s.get('total_sessions', 0) - s.get('total_present', 0) for s in students)
+                },
+                'recent_sessions': insights.get('sessions', [])[:5],
+                'students': students
+            }
+        
+        if dashboard:
+            _write_snapshot('dashboard-data.json', {"data": dashboard, "cached": False})
 
-        # 6. Last result (used by LiveAnalytics)
+        # Export last result (used by LiveAnalytics)
         if last_result:
             _write_snapshot('last-result.json', last_result)
 
-        # 7. Gallery info
+        # Export gallery info
         gallery_path = DEFAULT_GALLERY_DIR
         if os.path.exists(gallery_path):
             people = []
@@ -679,9 +854,11 @@ def export_data_snapshot(last_result: Dict[str, Any] = None):
                     people.append({"name": person_dir, "image_count": image_count})
             _write_snapshot('gallery-info.json', {"gallery_path": gallery_path, "people": people})
 
-        print("📦 Data snapshot exported for offline frontend")
+        print("✅ Data snapshot exported successfully for offline frontend")
     except Exception as e:
-        print(f"⚠️ Data snapshot export failed: {e}")
+        import traceback
+        print(f"❌ Data snapshot export failed: {e}")
+        traceback.print_exc()
 
 
 def _write_snapshot(filename: str, data: Any):
@@ -838,33 +1015,38 @@ def video_stream():
         if not os.path.exists(video_path):
             # Check if processing is happening
             if app_state.processing_status.get("is_processing", False):
-                # Show processing message
+                # Show processing message, re-check for the video file periodically
                 import numpy as np
-                dummy_frame = np.zeros((480, 640, 3), dtype=np.uint8)
-                cv2.putText(dummy_frame, "Processing Video...", (120, 200), 
-                           cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
-                cv2.putText(dummy_frame, f"{app_state.processing_status.get('progress', 0)}% Complete", (150, 250), 
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
-                ret, buffer = cv2.imencode('.jpg', dummy_frame)
-                frame = buffer.tobytes()
-                while True:
+                while not os.path.exists(video_path):
+                    progress = app_state.processing_status.get('progress', 0)
+                    dummy_frame = np.zeros((480, 640, 3), dtype=np.uint8)
+                    cv2.putText(dummy_frame, "Processing Video...", (120, 200), 
+                               cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+                    cv2.putText(dummy_frame, f"{progress}% Complete", (150, 250), 
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+                    ret, buffer = cv2.imencode('.jpg', dummy_frame)
+                    frame = buffer.tobytes()
                     yield (b'--frame\r\n'
                            b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
                     time.sleep(0.5)
             else:
-                # Show waiting message
+                # Show waiting message, re-check periodically in case processing starts
                 import numpy as np
-                dummy_frame = np.zeros((480, 640, 3), dtype=np.uint8)
-                cv2.putText(dummy_frame, "Starting Processing...", (100, 200), 
-                           cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
-                cv2.putText(dummy_frame, "Please wait", (180, 250), 
-                           cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
-                ret, buffer = cv2.imencode('.jpg', dummy_frame)
-                frame = buffer.tobytes()
-                while True:
+                for _ in range(20):  # Wait up to 10 seconds then stop
+                    dummy_frame = np.zeros((480, 640, 3), dtype=np.uint8)
+                    cv2.putText(dummy_frame, "No Processed Video Yet", (80, 200), 
+                               cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+                    cv2.putText(dummy_frame, "Run an analysis to begin", (100, 250), 
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.8, (200, 200, 200), 2)
+                    ret, buffer = cv2.imencode('.jpg', dummy_frame)
+                    frame = buffer.tobytes()
                     yield (b'--frame\r\n'
                            b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
-                    time.sleep(1)
+                    time.sleep(0.5)
+                    if os.path.exists(video_path):
+                        break
+                if not os.path.exists(video_path):
+                    return
             
         cap = cv2.VideoCapture(video_path)
         
@@ -1090,6 +1272,79 @@ def delete_all_sessions():
     try:
         count = db.delete_all_sessions()
         return {"success": True, "message": f"Deleted {count} sessions", "deleted_count": count}
+    except Exception as e:
+        return {"error": str(e)}
+
+# ─── Email Configuration ───────────────────────────────────────────
+# Uses Gmail SMTP with App Password. Set these environment variables:
+#   CORIS_SENDER_EMAIL  - Gmail address to send from
+#   CORIS_SENDER_PASS   - Gmail App Password (not regular password)
+# Or the defaults below will be used.
+SENDER_EMAIL = os.environ.get("CORIS_SENDER_EMAIL", "coris.attendance.system@gmail.com")
+SENDER_PASS = os.environ.get("CORIS_SENDER_PASS", "")
+
+class EmailRequest(BaseModel):
+    student_names: List[str]
+    subject: str
+    body: str
+
+@app.post("/send-defaulter-emails")
+def send_defaulter_emails(req: EmailRequest):
+    """Send attendance alert emails to defaulter students"""
+    if not DATABASE_AVAILABLE:
+        return {"error": "Database not available"}
+    if not SENDER_PASS:
+        return {"error": "Email not configured. Set CORIS_SENDER_EMAIL and CORIS_SENDER_PASS environment variables."}
+
+    try:
+        emails = db.get_student_emails(req.student_names)
+        if not emails:
+            return {"error": "No email addresses found for selected students"}
+
+        sent = []
+        failed = []
+
+        server = smtplib.SMTP("smtp.gmail.com", 587)
+        server.starttls()
+        server.login(SENDER_EMAIL, SENDER_PASS)
+
+        for name, email_addr in emails.items():
+            try:
+                msg = MIMEMultipart()
+                msg["From"] = SENDER_EMAIL
+                msg["To"] = email_addr
+                msg["Subject"] = req.subject
+                msg.attach(MIMEText(req.body, "plain"))
+                server.sendmail(SENDER_EMAIL, email_addr, msg.as_string())
+                sent.append({"name": name, "email": email_addr})
+            except Exception as e:
+                failed.append({"name": name, "email": email_addr, "error": str(e)})
+
+        server.quit()
+
+        return {
+            "success": True,
+            "sent": sent,
+            "failed": failed,
+            "total_sent": len(sent),
+            "total_failed": len(failed)
+        }
+    except smtplib.SMTPAuthenticationError:
+        return {"error": "Email authentication failed. Check CORIS_SENDER_EMAIL and CORIS_SENDER_PASS."}
+    except Exception as e:
+        return {"error": f"Failed to send emails: {str(e)}"}
+
+@app.get("/student-emails")
+def get_student_emails():
+    """Get all student email addresses"""
+    if not DATABASE_AVAILABLE:
+        return {"error": "Database not available"}
+    try:
+        import sqlite3
+        with sqlite3.connect(db.db_path) as conn:
+            cursor = conn.cursor()
+            cursor.execute("SELECT name, email FROM students WHERE email IS NOT NULL")
+            return {"emails": {row[0]: row[1] for row in cursor.fetchall()}}
     except Exception as e:
         return {"error": str(e)}
 

@@ -8,7 +8,7 @@ import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
   CartesianGrid, AreaChart, Area, Cell,
 } from 'recharts';
-import { cachedFetch } from '../hooks/useBackend';
+import { cachedFetch, useWebSocket } from '../hooks/useBackend';
 
 const API = 'http://localhost:8000';
 
@@ -55,6 +55,7 @@ interface SessionDetail {
 type SortKey = 'name' | 'start_time' | 'total_students' | 'present_students' | 'duration_seconds';
 
 const Sessions: React.FC = () => {
+  const { status } = useWebSocket('ws://localhost:8000/ws');
   const [sessions, setSessions] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
@@ -75,7 +76,15 @@ const Sessions: React.FC = () => {
     } catch { /* ignore */ } finally { setLoading(false); }
   };
 
+  // Load on mount
   useEffect(() => { loadSessions(); }, []);
+  
+  // Reload when processing completes (new session finished)
+  useEffect(() => {
+    if (!status.is_processing) {
+      setTimeout(loadSessions, 1000); // Wait 1s for data to be written
+    }
+  }, [status.is_processing]);
 
   const openDetail = async (id: number) => {
     setDetailLoading(true);

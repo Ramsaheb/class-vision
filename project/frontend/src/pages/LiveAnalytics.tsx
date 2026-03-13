@@ -6,6 +6,28 @@ import {
 import { useWebSocket, AttendanceResult, cachedFetch } from '../hooks/useBackend';
 
 const API = 'http://localhost:8000';
+const PRESENT_PCT_THRESHOLD = 30;
+const PRESENT_SEC_THRESHOLD = 10;
+
+function normalizeName(name: string): string {
+  return name.trim().toLowerCase();
+}
+
+function isPresentRecord(record?: { presence_percentage?: number; presence_seconds?: number } | null): boolean {
+  if (!record) return false;
+  return (record.presence_percentage || 0) >= PRESENT_PCT_THRESHOLD || (record.presence_seconds || 0) >= PRESENT_SEC_THRESHOLD;
+}
+
+function loadCachedWsResult(): AttendanceResult | null {
+  try {
+    const raw = localStorage.getItem('coris_cache_ws_result');
+    if (!raw) return null;
+    const parsed = JSON.parse(raw) as { data?: AttendanceResult };
+    return parsed?.data || null;
+  } catch {
+    return null;
+  }
+}
 
 const LiveAnalytics: React.FC = () => {
   const { status, result, isConnected } = useWebSocket('ws://localhost:8000/ws');
@@ -14,6 +36,11 @@ const LiveAnalytics: React.FC = () => {
   const [starting, setStarting] = useState(false);
   const [log, setLog] = useState<Array<{time: string; msg: string; type: string}>>([]);
   const [offline, setOffline] = useState(false);
+  const [savedVideoError, setSavedVideoError] = useState(false);
+  const [videoSourceIndex, setVideoSourceIndex] = useState(0);
+  const [videoRetryTick, setVideoRetryTick] = useState(0);
+  const [videoReady, setVideoReady] = useState(false);
+  const [videoPathInput, setVideoPathInput] = useState('attendance_output.mp4');
 
   const fetchData = useCallback(async () => {
     try {
@@ -21,15 +48,78 @@ const LiveAnalytics: React.FC = () => {
         cachedFetch<any>(API + '/last-result', '/last-result'),
         cachedFetch<any>(API + '/gallery-info', '/gallery-info'),
       ]);
-      if (lrResult.data && !lrResult.data.error) setLastResult(lrResult.data);
+
+      const latestResult = (lrResult.data && !lrResult.data.error && lrResult.data.attendance)
+        ? lrResult.data
+        : loadCachedWsResult();
+
+      if (latestResult && !latestResult.error) setLastResult(latestResult);
       if (giResult.data && !giResult.data.error) setGallery(giResult.data);
-      setOffline(lrResult.offline && giResult.offline);
+      setOffline(lrResult.offline || giResult.offline);
     } catch { /* ignore */ }
   }, []);
 
   useEffect(() => { fetchData(); }, [fetchData]);
-  useEffect(() => { if (result) { setLastResult(result); addLog('Processing completed', 'pos'); } }, [result]);
+  useEffect(() => {
+    if (result) {
+      setLastResult(result);
+      setSavedVideoError(false);
+      setVideoSourceIndex(0);
+      addLog('Processing completed', 'pos');
+    }
+  }, [result]);
   useEffect(() => { if (status.is_processing) addLog(status.message, 'info'); }, [status.message, status.is_processing]);
+
+  useEffect(() => {
+    if (status.is_processing) {
+      setSavedVideoError(false);
+      setVideoSourceIndex(0);
+      setVideoReady(false);
+    }
+  }, [status.is_processing]);
+
+  useEffect(() => {
+    if (status.is_processing) return;
+
+    let cancelled = false;
+    let intervalId: number | undefined;
+
+    const checkVideoReady = async () => {
+      try {
+        const path = encodeURIComponent((videoPathInput || 'attendance_output.mp4').trim());
+        const res = await fetch(API + '/download-output?path=' + path + '&ts=' + Date.now(), { cache: 'no-store' });
+        if (!res.ok) {
+          if (!cancelled) setVideoReady(false);
+          return;
+        }
+
+        const contentType = (res.headers.get('content-type') || '').toLowerCase();
+        const isJsonError = contentType.includes('application/json');
+        if (!cancelled) setVideoReady(!isJsonError);
+      } catch {
+        if (!cancelled) setVideoReady(false);
+      }
+    };
+
+    checkVideoReady();
+    intervalId = window.setInterval(checkVideoReady, 2000);
+
+    return () => {
+      cancelled = true;
+      if (intervalId) window.clearInterval(intervalId);
+    };
+  }, [status.is_processing, videoRetryTick, videoPathInput]);
+
+  useEffect(() => {
+    if (!status.is_processing && savedVideoError) {
+      const timer = window.setTimeout(() => {
+        setSavedVideoError(false);
+        setVideoSourceIndex(0);
+        setVideoRetryTick((v) => v + 1);
+      }, 2500);
+      return () => window.clearTimeout(timer);
+    }
+  }, [savedVideoError, status.is_processing]);
 
   const addLog = (msg: string, type: string) => {
     const time = new Date().toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
@@ -50,11 +140,14 @@ const LiveAnalytics: React.FC = () => {
 
   const downloadCSV = () => {
     const att = lastResult?.attendance || {};
+    const attendanceByName = new Map(
+      Object.entries(att).map(([name, value]) => [normalizeName(name), value])
+    );
     const allStudents = gallery?.people || [];
     const headers = ['Student', 'Status', 'Presence(s)', 'Presence(%)', 'Confidence', 'Attention', 'Attention State'];
     const rows = allStudents.map(s => {
-      const r = att[s.name];
-      const present = r ? ((r.presence_percentage || 0) >= 30 || (r.presence_seconds || 0) >= 10) : false;
+      const r = attendanceByName.get(normalizeName(s.name));
+      const present = isPresentRecord(r);
       const attn = lastResult?.attentiveness?.individual_scores?.[s.name];
       return [s.name, present ? 'Present' : 'Absent', (r?.presence_seconds || 0).toFixed(1),
         (r?.presence_percentage || 0).toFixed(1), ((r?.avg_confidence || 0) * 100).toFixed(0) + '%',
@@ -70,10 +163,23 @@ const LiveAnalytics: React.FC = () => {
   };
 
   const att = lastResult?.attendance || {};
+  const attendanceByName = new Map(
+    Object.entries(att).map(([name, value]) => [normalizeName(name), value])
+  );
   const totalStudents = gallery?.people?.length || 0;
-  const presentStudents = Object.values(att).filter((d) => (d.presence_percentage || 0) >= 30 || (d.presence_seconds || 0) >= 10).length;
+  const presentStudents = (gallery?.people || []).filter((student) =>
+    isPresentRecord(attendanceByName.get(normalizeName(student.name)))
+  ).length;
   const attendanceRate = totalStudents > 0 ? Math.round(presentStudents / totalStudents * 100) : 0;
   const avgAttention = lastResult?.attentiveness?.class_average || 0;
+  const tsParam = encodeURIComponent(lastResult?.timestamp || String(videoRetryTick) || 'latest');
+  const encodedVideoPath = encodeURIComponent((videoPathInput || 'attendance_output.mp4').trim());
+  const videoSources = [
+    API + '/download-output?path=' + encodedVideoPath + '&ts=' + tsParam,
+    API + '/download-output?ts=' + tsParam,
+    API + '/download-output?path=attendance_output.mp4&ts=' + tsParam,
+    API + '/download-output?path=backend/attendance_output.mp4&ts=' + tsParam,
+  ];
 
   return (
     <div className="space-y-6 max-w-[1400px] mx-auto animate-fade-in">
@@ -153,19 +259,84 @@ const LiveAnalytics: React.FC = () => {
               <span className="text-[10px] font-semibold text-gray-400 uppercase tracking-wider">IDLE</span>
             )}
           </div>
+          <div className="px-4 pt-4 pb-0">
+            <div className="flex flex-col sm:flex-row gap-2">
+              <input
+                value={videoPathInput}
+                onChange={(e) => setVideoPathInput(e.target.value)}
+                placeholder="attendance_output.mp4"
+                className="input-field text-xs"
+              />
+              <button
+                onClick={() => {
+                  setSavedVideoError(false);
+                  setVideoSourceIndex(0);
+                  setVideoReady(false);
+                  setVideoRetryTick((v) => v + 1);
+                }}
+                className="btn-secondary text-xs whitespace-nowrap"
+              >
+                Load Output Video
+              </button>
+            </div>
+          </div>
           <div className="p-4">
             <div className="relative aspect-video bg-gray-100 dark:bg-gray-800 rounded-2xl overflow-hidden border border-gray-200 dark:border-gray-700">
-              {isConnected ? (
-                <img src={API + '/video-stream'} alt="Feed" className="w-full h-full object-contain"
-                  onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }} />
-              ) : (
-                <div className="flex flex-col items-center justify-center h-full text-gray-400 gap-3">
-                  <div className="w-16 h-16 rounded-2xl bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
-                    <VideoOff className="w-8 h-8" />
+              {status.is_processing ? (
+                isConnected ? (
+                  <img
+                    src={API + '/video-stream'}
+                    alt="Feed"
+                    className="w-full h-full object-contain"
+                    onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                  />
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-full text-gray-400 gap-3">
+                    <Loader2 className="w-8 h-8 animate-spin" />
+                    <p className="text-sm font-medium">Loading video stream...</p>
                   </div>
-                  <p className="text-sm font-medium">No feed available</p>
-                  <p className="text-xs text-gray-400">Start an analysis to begin streaming</p>
-                </div>
+                )
+              ) : (
+                videoReady && !savedVideoError ? (
+                  <video
+                    key={(lastResult?.timestamp || 'saved-video') + '-src-' + videoSourceIndex + '-retry-' + videoRetryTick}
+                    src={videoSources[videoSourceIndex]}
+                    className="w-full h-full object-contain"
+                    controls
+                    autoPlay
+                    muted
+                    loop
+                    playsInline
+                    onLoadedData={() => setSavedVideoError(false)}
+                    onError={() => {
+                      if (videoSourceIndex < videoSources.length - 1) {
+                        setVideoSourceIndex((i) => i + 1);
+                      } else {
+                        setSavedVideoError(true);
+                      }
+                    }}
+                  />
+                ) : savedVideoError ? (
+                  <div className="relative w-full h-full">
+                    <img
+                      src={API + '/video-stream'}
+                      alt="Saved video fallback stream"
+                      className="w-full h-full object-contain"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none'; }}
+                    />
+                    <div className="absolute top-2 left-2 rounded-lg bg-amber-500/90 text-white text-[10px] px-2 py-1 font-semibold">
+                      Browser codec fallback stream
+                    </div>
+                  </div>
+                ) : (
+                  <div className="flex flex-col items-center justify-center h-full text-gray-400 gap-3">
+                    <div className="w-16 h-16 rounded-2xl bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+                      <VideoOff className="w-8 h-8" />
+                    </div>
+                    <p className="text-sm font-medium">Waiting for generated output video...</p>
+                    <p className="text-xs text-gray-400">Video will appear automatically after backend finishes processing</p>
+                  </div>
+                )
               )}
             </div>
           </div>
@@ -212,8 +383,12 @@ const LiveAnalytics: React.FC = () => {
           </div>
           <div className="p-5 grid grid-cols-3 sm:grid-cols-4 md:grid-cols-7 gap-3">
             {gallery.people.map(p => {
-              const r = att[p.name];
-              const present = r ? ((r.presence_percentage || 0) >= 30 || (r.presence_seconds || 0) >= 10) : false;
+              const r = attendanceByName.get(normalizeName(p.name));
+              const present = isPresentRecord(r);
+              const attn = lastResult?.attentiveness?.individual_scores?.[p.name];
+              const attnPct = attn?.attention_pct || 0;
+              const attnState = attn?.state || '';
+              const emotion = attn?.emotion || '';
               return (
                 <div key={p.name} className={'p-3 rounded-2xl text-center border-2 transition-all hover:scale-[1.02] ' + (present ? 'bg-emerald-50 dark:bg-emerald-900/10 border-emerald-300 dark:border-emerald-800 shadow-sm' : 'bg-red-50 dark:bg-red-900/10 border-red-200 dark:border-red-900 shadow-sm')}>
                   <div className={'avatar w-12 h-12 mx-auto mb-2 text-lg bg-gradient-to-br ' + (present ? 'from-emerald-400 to-teal-500' : 'from-red-400 to-rose-500')}>
@@ -222,6 +397,17 @@ const LiveAnalytics: React.FC = () => {
                   <p className="text-xs font-bold text-gray-800 dark:text-gray-200 truncate">{p.name}</p>
                   <p className={'text-[10px] font-semibold mt-0.5 ' + (present ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-500 dark:text-red-400')}>{present ? 'Present' : 'Absent'}</p>
                   {r && <p className="text-[9px] text-gray-400 mt-0.5">{Math.round(r.presence_seconds || 0)}s &middot; {((r.avg_confidence || 0) * 100).toFixed(0)}%</p>}
+                  {present && attnPct > 0 && (
+                    <div className="mt-1.5 space-y-0.5">
+                      <div className="w-full h-1 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+                        <div className={'h-full rounded-full ' + (attnPct >= 70 ? 'bg-emerald-500' : attnPct >= 40 ? 'bg-amber-500' : 'bg-red-500')} style={{ width: Math.min(attnPct, 100) + '%' }} />
+                      </div>
+                      <p className={'text-[9px] font-semibold ' + (attnPct >= 70 ? 'text-emerald-600 dark:text-emerald-400' : attnPct >= 40 ? 'text-amber-600 dark:text-amber-400' : 'text-red-500')}>{attnPct.toFixed(0)}% {attnState}</p>
+                    </div>
+                  )}
+                  {present && emotion && emotion !== 'unknown' && emotion !== 'N/A' && (
+                    <p className="text-[9px] text-gray-400 capitalize mt-0.5">{emotion}</p>
+                  )}
                 </div>
               );
             })}

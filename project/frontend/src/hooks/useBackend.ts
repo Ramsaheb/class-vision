@@ -2,6 +2,24 @@ import { useState, useEffect, useRef, useCallback } from 'react';
 
 // ─── Local Storage Cache Helpers ──────────────────────────────
 const CACHE_PREFIX = 'coris_cache_';
+const CACHE_VERSION_KEY = 'coris_cache_version';
+const CURRENT_CACHE_VERSION = '2026-03-13-v2-reset-all'; // Increment to force cache clear
+
+// Clear all cached data if version changed
+function checkAndClearCache(): void {
+  const storedVersion = localStorage.getItem(CACHE_VERSION_KEY);
+  if (storedVersion !== CURRENT_CACHE_VERSION) {
+    // Clear all coris cache entries
+    Object.keys(localStorage)
+      .filter(k => k.startsWith(CACHE_PREFIX))
+      .forEach(k => localStorage.removeItem(k));
+    localStorage.setItem(CACHE_VERSION_KEY, CURRENT_CACHE_VERSION);
+    console.log('[CORIS] Cache cleared due to version update');
+  }
+}
+
+// Run cache check on module load
+checkAndClearCache();
 
 function cacheKey(endpoint: string): string {
   return CACHE_PREFIX + endpoint.replace(/[^a-zA-Z0-9_-]/g, '_');
@@ -58,11 +76,18 @@ async function loadFromSnapshot<T>(key: string): Promise<T | null> {
 }
 
 /**
- * Fetch with automatic localStorage caching + static snapshot fallback.
- * 1. Try live API
- * 2. Fall back to localStorage cache
- * 3. Fall back to static /data/*.json snapshot (exported after each backend run)
- * Returns { data, offline } so pages can show a banner.
+ * Smart fetch strategy for different page types:
+ * 
+ * DASHBOARD/STUDENTS/SESSIONS/DEFAULTERS (historical data):
+ *   1. Try live API (fresh database data)
+ *   2. Fall back to localStorage cache
+ *   3. Fall back to static /data/*.json (exported after each session) ← WORKS WITHOUT BACKEND
+ *   Returns { data, offline } so pages show offline banner
+ * 
+ * LIVEANALYTICS (real-time only):
+ *   - Uses WebSocket for live updates
+ *   - Needs backend running
+ *   - Static snapshots only for last completed session video
  */
 export async function cachedFetch<T = unknown>(
   url: string,
@@ -71,20 +96,25 @@ export async function cachedFetch<T = unknown>(
   let key: string;
   try { key = endpoint || new URL(url).pathname; }
   catch { key = endpoint || url.replace(/^https?:\/\/[^/]+/, ''); }
+  
+  // Tier 1: Try live API first
   try {
-    const res = await fetch(url);
+    const res = await fetch(url, { cache: 'no-store' });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = (await res.json()) as T;
     saveToCache(key, data);
     return { data, offline: false };
   } catch {
-    // Tier 2: localStorage
-    const cached = loadFromCache<T>(key);
-    if (cached) return { data: cached, offline: true };
-    // Tier 3: static snapshot file
-    const snapshot = await loadFromSnapshot<T>(key);
-    return { data: snapshot, offline: true };
+    // API failed or backend not running
   }
+  
+  // Tier 2: Try localStorage cache (fastest fallback)
+  const cached = loadFromCache<T>(key);
+  if (cached) return { data: cached, offline: true };
+  
+  // Tier 3: Try static snapshot file (exported after each session runs)
+  const snapshot = await loadFromSnapshot<T>(key);
+  return { data: snapshot, offline: true };
 }
 
 // ─── Interfaces ───────────────────────────────────────────────

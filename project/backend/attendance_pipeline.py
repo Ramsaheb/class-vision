@@ -21,7 +21,32 @@ DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 DEFAULT_GALLERY_DIR = os.path.join(PROJECT_ROOT, 'SI1')
 DEFAULT_VIDEO_PATH = os.path.join(PROJECT_ROOT, 'input1.mp4')
 DEFAULT_OUTPUT_VIDEO = os.path.join(PROJECT_ROOT, 'attendance_output.mp4')
-PROCESS_EVERY_N_FRAMES = 1
+PROCESS_EVERY_N_FRAMES = max(1, int(os.getenv('PROCESS_EVERY_N_FRAMES', '5')))
+
+
+def _create_robust_video_writer(output_video: str, fps: float, width: int, height: int):
+    """Create a VideoWriter with codec fallback to avoid unreadable output files."""
+    safe_fps = float(fps) if fps and fps > 1 else 25.0
+    safe_width = int(width) if width and width > 0 else 640
+    safe_height = int(height) if height and height > 0 else 480
+
+    codec_candidates = ['mp4v', 'XVID', 'MJPG']
+    for codec in codec_candidates:
+        writer = cv2.VideoWriter(
+            output_video,
+            cv2.VideoWriter_fourcc(*codec),
+            safe_fps,
+            (safe_width, safe_height)
+        )
+        if writer.isOpened():
+            print(f"🎥 Video writer initialized with codec={codec}, fps={safe_fps:.2f}, size={safe_width}x{safe_height}")
+            return writer
+        writer.release()
+
+    raise RuntimeError(
+        f"Failed to create output writer for {output_video}. "
+        f"Tried codecs: {codec_candidates}"
+    )
 
 # Multi-detector
 USE_YOLO_FACE = True
@@ -581,6 +606,8 @@ def run_attendance_cached(
     
     # Initialize cache
     cache = AttendanceCache()
+
+    print(f"⚡ Frame sampling: processing 1 of every {PROCESS_EVERY_N_FRAMES} frame(s)")
     
     if clear_cache:
         cache.clear_cache()
@@ -660,8 +687,7 @@ def run_attendance_cached(
     
     print(f"🎬 Processing video: {frame_w}x{frame_h} @ {fps:.1f} FPS, {total_frames} frames")
     
-    fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-    out = cv2.VideoWriter(output_video, fourcc, fps, (frame_w, frame_h))
+    out = _create_robust_video_writer(output_video, fps, frame_w, frame_h) if output_video else None
 
     tracks: List[AdvancedTrack] = []  # type: ignore[name-defined]
     detection_stats = defaultdict(int)
@@ -684,7 +710,8 @@ def run_attendance_cached(
         progress_percent = (frame_idx / max(total_frames, 1)) * 100 if total_frames > 0 else 0
         
         if frame_idx % PROCESS_EVERY_N_FRAMES != 0:
-            out.write(frame)
+            if out is not None:
+                out.write(frame)
             continue
         
         # Show progress and send callback (reduced frequency)
@@ -794,10 +821,12 @@ def run_attendance_cached(
             conf_val = track.get_track_confidence()
             cv2.putText(vis_frame, f"{label} ({conf_val:.2f})", (x1, max(0, y1-10)), cv2.FONT_HERSHEY_SIMPLEX, 0.6, color, 2)
         
-        out.write(vis_frame)
+        if out is not None:
+            out.write(vis_frame)
 
     cap.release()
-    out.release()
+    if out is not None:
+        out.release()
 
     # Calculate video duration for percentage-based attendance
     video_duration_seconds = total_frames / max(fps, 1)

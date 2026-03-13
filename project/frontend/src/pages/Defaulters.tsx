@@ -1,13 +1,36 @@
 import React, { useEffect, useState, useMemo } from 'react';
 import {
   AlertTriangle, Mail, Search, TrendingDown, ShieldAlert, Filter,
-  CheckCircle, X, RefreshCw, UserX, Send, WifiOff,
+  CheckCircle, X, RefreshCw, UserX, Send, WifiOff, Loader2,
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid, Cell } from 'recharts';
-import { cachedFetch } from '../hooks/useBackend';
+import { cachedFetch, useWebSocket } from '../hooks/useBackend';
 
 const API = 'http://localhost:8000';
-const DEFAULTER_THRESHOLD = 75;
+const DEFAULTER_THRESHOLD = 60;
+const MIN_SESSIONS_FOR_DEFAULTER = 2;
+const PRESENT_PCT_THRESHOLD = 30;
+const PRESENT_SEC_THRESHOLD = 10;
+
+function normalizeName(name: string): string {
+  return name.trim().toLowerCase();
+}
+
+function isPresentRecord(record?: { presence_percentage?: number; presence_seconds?: number } | null): boolean {
+  if (!record) return false;
+  return (record.presence_percentage || 0) >= PRESENT_PCT_THRESHOLD || (record.presence_seconds || 0) >= PRESENT_SEC_THRESHOLD;
+}
+
+function loadCachedWsAttendance(): Record<string, { presence_percentage?: number; presence_seconds?: number }> {
+  try {
+    const raw = localStorage.getItem('coris_cache_ws_result');
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as { data?: { attendance?: Record<string, { presence_percentage?: number; presence_seconds?: number }> } };
+    return parsed?.data?.attendance || {};
+  } catch {
+    return {};
+  }
+}
 
 interface StudentData {
   name: string;
@@ -25,8 +48,17 @@ interface StudentData {
 
 type Severity = 'all' | 'critical' | 'warning' | 'moderate';
 
+interface EmailResult {
+  type: 'success' | 'error';
+  message: string;
+  sent?: { name: string; email: string }[];
+  failed?: { name: string; email: string; error: string }[];
+}
+
 const Defaulters: React.FC = () => {
+  const { status, result } = useWebSocket('ws://localhost:8000/ws');
   const [students, setStudents] = useState<StudentData[]>([]);
+  const [latestPresentNames, setLatestPresentNames] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [severity, setSeverity] = useState<Severity>('all');
@@ -35,18 +67,54 @@ const Defaulters: React.FC = () => {
   const [emailSubject, setEmailSubject] = useState('Attendance Alert - Immediate Attention Required');
   const [emailBody, setEmailBody] = useState('');
   const [offline, setOffline] = useState(false);
+  const [sending, setSending] = useState(false);
+  const [emailResult, setEmailResult] = useState<EmailResult | null>(null);
 
   const loadData = async () => {
     try {
       setLoading(true);
-      const { data: json, offline: isOffline } = await cachedFetch<any>(API + '/student-insights', '/student-insights');
-      const d = json?.data || json;
+      const [{ data: insightsJson, offline: insightsOffline }, { data: lrJson, offline: lrOffline }] = await Promise.all([
+        cachedFetch<any>(API + '/student-insights', '/student-insights'),
+        cachedFetch<any>(API + '/last-result', '/last-result'),
+      ]);
+
+      const d = insightsJson?.data || insightsJson;
       setStudents(d?.students || []);
-      setOffline(isOffline);
+
+      const attendanceFromWs = (result?.attendance || {}) as Record<string, { presence_percentage?: number; presence_seconds?: number }>;
+      const attendanceFromApi = (lrJson?.attendance || {}) as Record<string, { presence_percentage?: number; presence_seconds?: number }>;
+      const attendance = Object.keys(attendanceFromWs).length > 0
+        ? attendanceFromWs
+        : (Object.keys(attendanceFromApi).length > 0 ? attendanceFromApi : loadCachedWsAttendance());
+      const presentSet = new Set<string>();
+      Object.entries(attendance).forEach(([name, rec]) => {
+        if (isPresentRecord(rec)) presentSet.add(normalizeName(name));
+      });
+      setLatestPresentNames(presentSet);
+
+      setOffline(insightsOffline || lrOffline);
     } catch { /* ignore */ } finally { setLoading(false); }
   };
 
+  // Load on mount
   useEffect(() => { loadData(); }, []);
+  // Reload when processing completes (new session finished)
+  useEffect(() => {
+    if (!status.is_processing) {
+      setTimeout(loadData, 1000); // Wait 1s for data to be written
+    }
+  }, [status.is_processing]);
+
+  useEffect(() => {
+    const attendanceFromWs = (result?.attendance || {}) as Record<string, { presence_percentage?: number; presence_seconds?: number }>;
+    if (Object.keys(attendanceFromWs).length === 0) return;
+
+    const presentSet = new Set<string>();
+    Object.entries(attendanceFromWs).forEach(([name, rec]) => {
+      if (isPresentRecord(rec)) presentSet.add(normalizeName(name));
+    });
+    setLatestPresentNames(presentSet);
+  }, [result]);
 
   const getSeverity = (rate: number): 'critical' | 'warning' | 'moderate' | 'ok' => {
     if (rate < 25) return 'critical';
@@ -57,13 +125,16 @@ const Defaulters: React.FC = () => {
 
   const severityConfig = {
     critical: { label: 'Critical', gradient: 'from-red-500 to-rose-600', color: 'text-red-600 dark:text-red-400', bg: 'bg-red-50 dark:bg-red-900/20', border: 'border-red-200 dark:border-red-800', ring: 'ring-red-200 dark:ring-red-900' },
-    warning: { label: 'Warning', gradient: 'from-orange-500 to-amber-600', color: 'text-orange-600 dark:text-orange-400', bg: 'bg-orange-50 dark:bg-orange-900/20', border: 'border-orange-200 dark:border-orange-800', ring: 'ring-orange-200 dark:ring-orange-900' },
     moderate: { label: 'Moderate', gradient: 'from-yellow-500 to-amber-500', color: 'text-yellow-600 dark:text-yellow-400', bg: 'bg-yellow-50 dark:bg-yellow-900/20', border: 'border-yellow-200 dark:border-yellow-800', ring: 'ring-yellow-200 dark:ring-yellow-900' },
   };
 
   const defaulters = useMemo(() =>
-    students.filter(s => s.total_sessions > 0 && s.attendance_rate < DEFAULTER_THRESHOLD)
-  , [students]);
+    students.filter(s =>
+      s.total_sessions >= MIN_SESSIONS_FOR_DEFAULTER &&
+      s.attendance_rate < DEFAULTER_THRESHOLD &&
+      !latestPresentNames.has(normalizeName(s.name))
+    )
+  , [students, latestPresentNames]);
 
   const filtered = useMemo(() => {
     let list = [...defaulters];
@@ -116,10 +187,39 @@ const Defaulters: React.FC = () => {
     setShowComposer(true);
   };
 
-  const sendEmails = () => {
-    const mailto = 'mailto:?subject=' + encodeURIComponent(emailSubject) + '&body=' + encodeURIComponent(emailBody);
-    window.open(mailto);
-    setShowComposer(false);
+  const sendEmails = async () => {
+    setSending(true);
+    setEmailResult(null);
+    try {
+      const selectedNames = filtered.filter(s => selectedIds.has(s.name)).map(s => s.name);
+      const res = await fetch(API + '/send-defaulter-emails', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          student_names: selectedNames,
+          subject: emailSubject,
+          body: emailBody,
+        }),
+      });
+      const data = await res.json();
+      if (data.error) {
+        setEmailResult({ type: 'error', message: data.error });
+      } else {
+        setEmailResult({
+          type: 'success',
+          message: `Sent ${data.total_sent} email(s) successfully${data.total_failed > 0 ? `, ${data.total_failed} failed` : ''}`,
+          sent: data.sent,
+          failed: data.failed,
+        });
+        if (data.total_sent > 0 && data.total_failed === 0) {
+          setTimeout(() => { setShowComposer(false); setEmailResult(null); }, 3000);
+        }
+      }
+    } catch {
+      setEmailResult({ type: 'error', message: 'Failed to connect to backend. Is the server running?' });
+    } finally {
+      setSending(false);
+    }
   };
 
   if (loading) {
@@ -146,7 +246,7 @@ const Defaulters: React.FC = () => {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold text-gray-900 dark:text-white">Defaulter Management</h2>
-          <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Students below {DEFAULTER_THRESHOLD}% attendance threshold</p>
+          <p className="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Students below {DEFAULTER_THRESHOLD}% attendance threshold ({MIN_SESSIONS_FOR_DEFAULTER}+ sessions)</p>
         </div>
         <button onClick={() => loadData()} className="btn-secondary flex items-center gap-1.5 text-xs">
           <RefreshCw className="w-3.5 h-3.5" /> Refresh
@@ -339,11 +439,27 @@ const Defaulters: React.FC = () => {
                 />
               </div>
               <div className="flex justify-end gap-3 pt-2">
-                <button onClick={() => setShowComposer(false)} className="btn-ghost">Cancel</button>
-                <button onClick={sendEmails} className="btn-primary flex items-center gap-2">
-                  <Send className="w-4 h-4" />Open in Mail Client
+                <button onClick={() => { setShowComposer(false); setEmailResult(null); }} className="btn-ghost">Cancel</button>
+                <button onClick={sendEmails} disabled={sending} className="btn-primary flex items-center gap-2">
+                  {sending ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
+                  {sending ? 'Sending...' : 'Send Emails'}
                 </button>
               </div>
+              {emailResult && (
+                <div className={'mt-4 rounded-xl px-4 py-3 text-sm ' + (emailResult.type === 'success' ? 'bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-300 border border-green-200 dark:border-green-800' : 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border border-red-200 dark:border-red-800')}>
+                  <p className="font-semibold">{emailResult.type === 'success' ? '✅ ' : '❌ '}{emailResult.message}</p>
+                  {emailResult.sent && emailResult.sent.length > 0 && (
+                    <ul className="mt-2 space-y-0.5 text-xs opacity-80">
+                      {emailResult.sent.map(s => <li key={s.name}>Sent to {s.name} → {s.email}</li>)}
+                    </ul>
+                  )}
+                  {emailResult.failed && emailResult.failed.length > 0 && (
+                    <ul className="mt-2 space-y-0.5 text-xs opacity-80">
+                      {emailResult.failed.map(s => <li key={s.name}>Failed: {s.name} → {s.email} ({s.error})</li>)}
+                    </ul>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         </div>

@@ -2,16 +2,40 @@ import React, { useEffect, useState, useMemo } from 'react';
 import {
   Users, Search, ChevronDown, ChevronUp, TrendingUp, AlertTriangle,
   X, RefreshCw, GraduationCap, Eye, Clock, Award,
-  BarChart3, UserCheck, WifiOff,
+  BarChart3, UserCheck, WifiOff, Scan, Activity, Frown, Brain, Focus,
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
-  PieChart, Pie, Cell, CartesianGrid, AreaChart, Area,
+  PieChart, Pie, Cell, CartesianGrid, AreaChart, Area, RadarChart,
+  PolarGrid, PolarAngleAxis, PolarRadiusAxis, Radar, Legend,
 } from 'recharts';
-import { cachedFetch } from '../hooks/useBackend';
+import { cachedFetch, useWebSocket } from '../hooks/useBackend';
 
 const API = 'http://localhost:8000';
-const DEFAULTER_THRESHOLD = 75;
+const DEFAULTER_THRESHOLD = 60;
+const MIN_SESSIONS_FOR_DEFAULTER = 2;
+const PRESENT_PCT_THRESHOLD = 30;
+const PRESENT_SEC_THRESHOLD = 10;
+
+function normalizeName(name: string): string {
+  return name.trim().toLowerCase();
+}
+
+function isPresentRecord(record?: { presence_percentage?: number; presence_seconds?: number } | null): boolean {
+  if (!record) return false;
+  return (record.presence_percentage || 0) >= PRESENT_PCT_THRESHOLD || (record.presence_seconds || 0) >= PRESENT_SEC_THRESHOLD;
+}
+
+function loadCachedWsAttendance(): Record<string, { presence_percentage?: number; presence_seconds?: number }> {
+  try {
+    const raw = localStorage.getItem('coris_cache_ws_result');
+    if (!raw) return {};
+    const parsed = JSON.parse(raw) as { data?: { attendance?: Record<string, { presence_percentage?: number; presence_seconds?: number }> } };
+    return parsed?.data?.attendance || {};
+  } catch {
+    return {};
+  }
+}
 
 interface StudentData {
   name: string;
@@ -47,12 +71,17 @@ interface HistoryRecord {
   engagement: string;
   participation_events: number;
   participation_rate: number;
+  blink_rate: number;
+  gaze_stability: number;
+  head_movement: number;
 }
 
 type SortKey = 'name' | 'attendance_rate' | 'avg_attention_score' | 'total_present' | 'avg_presence_time';
 
 const Students: React.FC = () => {
+  const { status, result } = useWebSocket('ws://localhost:8000/ws');
   const [students, setStudents] = useState<StudentData[]>([]);
+  const [latestPresentNames, setLatestPresentNames] = useState<Set<string>>(new Set());
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [sortKey, setSortKey] = useState<SortKey>('name');
@@ -65,14 +94,49 @@ const Students: React.FC = () => {
   const loadData = async () => {
     try {
       setLoading(true);
-      const { data: json, offline: isOffline } = await cachedFetch<{ data?: { students?: StudentData[] }; students?: StudentData[] }>(API + '/student-insights', '/student-insights');
-      const d = json?.data || json;
+      const [{ data: insightsJson, offline: insightsOffline }, { data: lrJson, offline: lrOffline }] = await Promise.all([
+        cachedFetch<{ data?: { students?: StudentData[] }; students?: StudentData[] }>(API + '/student-insights', '/student-insights'),
+        cachedFetch<any>(API + '/last-result', '/last-result'),
+      ]);
+
+      const d = insightsJson?.data || insightsJson;
       setStudents(d?.students || []);
-      setOffline(isOffline);
+
+      const attendanceFromWs = (result?.attendance || {}) as Record<string, { presence_percentage?: number; presence_seconds?: number }>;
+      const attendanceFromApi = (lrJson?.attendance || {}) as Record<string, { presence_percentage?: number; presence_seconds?: number }>;
+      const attendance = Object.keys(attendanceFromWs).length > 0
+        ? attendanceFromWs
+        : (Object.keys(attendanceFromApi).length > 0 ? attendanceFromApi : loadCachedWsAttendance());
+      const presentSet = new Set<string>();
+      Object.entries(attendance).forEach(([name, rec]) => {
+        if (isPresentRecord(rec)) presentSet.add(normalizeName(name));
+      });
+      setLatestPresentNames(presentSet);
+
+      setOffline(insightsOffline || lrOffline);
     } catch { /* ignore */ } finally { setLoading(false); }
   };
 
+  // Load on mount
   useEffect(() => { loadData(); }, []);
+  
+  // Reload when processing completes (new session finished)
+  useEffect(() => {
+    if (!status.is_processing) {
+      setTimeout(loadData, 1000); // Wait 1s for data to be written
+    }
+  }, [status.is_processing]);
+
+  useEffect(() => {
+    const attendanceFromWs = (result?.attendance || {}) as Record<string, { presence_percentage?: number; presence_seconds?: number }>;
+    if (Object.keys(attendanceFromWs).length === 0) return;
+
+    const presentSet = new Set<string>();
+    Object.entries(attendanceFromWs).forEach(([name, rec]) => {
+      if (isPresentRecord(rec)) presentSet.add(normalizeName(name));
+    });
+    setLatestPresentNames(presentSet);
+  }, [result]);
 
   const loadHistory = async (name: string) => {
     setHistoryLoading(true);
@@ -93,8 +157,25 @@ const Students: React.FC = () => {
     else { setSortKey(key); setSortAsc(true); }
   };
 
+  const effectiveStudents = useMemo(() => students.map((s) => {
+    const livePresent = latestPresentNames.has(normalizeName(s.name));
+    if (!livePresent) return s;
+
+    const totalSessions = Math.max(s.total_sessions, 1);
+    const totalPresent = Math.max(s.total_present, 1);
+    const attendanceRate = Math.max(s.attendance_rate, (totalPresent / totalSessions) * 100);
+
+    return {
+      ...s,
+      total_sessions: totalSessions,
+      total_present: totalPresent,
+      attendance_rate: attendanceRate,
+      last_seen: s.last_seen || new Date().toISOString(),
+    };
+  }), [students, latestPresentNames]);
+
   const filtered = useMemo(() => {
-    let list = [...students];
+    let list = [...effectiveStudents];
     if (search) {
       const q = search.toLowerCase();
       list = list.filter(s => s.name.toLowerCase().includes(q));
@@ -105,11 +186,15 @@ const Students: React.FC = () => {
       return sortAsc ? (av as number) - (bv as number) : (bv as number) - (av as number);
     });
     return list;
-  }, [students, search, sortKey, sortAsc]);
+  }, [effectiveStudents, search, sortKey, sortAsc]);
 
-  const defaulterCount = students.filter(s => s.total_sessions > 0 && s.attendance_rate < DEFAULTER_THRESHOLD).length;
-  const avgAttendance = students.length > 0 ? students.reduce((s, st) => s + st.attendance_rate, 0) / students.length : 0;
-  const studentsWithAttn = students.filter(s => s.avg_attention_score > 0);
+  const defaulterCount = effectiveStudents.filter(s =>
+    s.total_sessions >= MIN_SESSIONS_FOR_DEFAULTER &&
+    s.attendance_rate < DEFAULTER_THRESHOLD &&
+    !latestPresentNames.has(normalizeName(s.name))
+  ).length;
+  const avgAttendance = effectiveStudents.length > 0 ? effectiveStudents.reduce((s, st) => s + st.attendance_rate, 0) / effectiveStudents.length : 0;
+  const studentsWithAttn = effectiveStudents.filter(s => s.avg_attention_score > 0);
   const avgAttention = studentsWithAttn.length > 0 ? studentsWithAttn.reduce((s, st) => s + st.avg_attention_score, 0) / studentsWithAttn.length : -1;
 
   const attendanceDist = useMemo(() => {
@@ -119,20 +204,20 @@ const Students: React.FC = () => {
       { range: '50-75%', count: 0, color: '#EAB308' },
       { range: '75-100%', count: 0, color: '#10B981' },
     ];
-    students.forEach(s => {
+    effectiveStudents.forEach(s => {
       if (s.attendance_rate < 25) bins[0].count++;
       else if (s.attendance_rate < 50) bins[1].count++;
       else if (s.attendance_rate < 75) bins[2].count++;
       else bins[3].count++;
     });
     return bins;
-  }, [students]);
+  }, [effectiveStudents]);
 
   const statusPie = useMemo(() => [
-    { name: 'Regular', value: students.filter(s => s.attendance_rate >= DEFAULTER_THRESHOLD).length, color: '#10B981' },
-    { name: 'At Risk', value: students.filter(s => s.attendance_rate >= 50 && s.attendance_rate < DEFAULTER_THRESHOLD).length, color: '#F59E0B' },
-    { name: 'Defaulter', value: students.filter(s => s.attendance_rate < 50).length, color: '#EF4444' },
-  ].filter(d => d.value > 0), [students]);
+    { name: 'Regular', value: effectiveStudents.filter(s => s.attendance_rate >= DEFAULTER_THRESHOLD).length, color: '#10B981' },
+    { name: 'At Risk', value: effectiveStudents.filter(s => s.total_sessions >= MIN_SESSIONS_FOR_DEFAULTER && s.attendance_rate >= 50 && s.attendance_rate < DEFAULTER_THRESHOLD && !latestPresentNames.has(normalizeName(s.name))).length, color: '#F59E0B' },
+    { name: 'Defaulter', value: effectiveStudents.filter(s => s.total_sessions >= MIN_SESSIONS_FOR_DEFAULTER && s.attendance_rate < 50 && !latestPresentNames.has(normalizeName(s.name))).length, color: '#EF4444' },
+  ].filter(d => d.value > 0), [effectiveStudents, latestPresentNames]);
 
   const SortIcon = ({ col }: { col: SortKey }) => {
     if (sortKey !== col) return <ChevronDown className="w-3 h-3 opacity-20" />;
@@ -273,7 +358,10 @@ const Students: React.FC = () => {
             </thead>
             <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
               {filtered.map(s => {
-                const isDefaulter = s.total_sessions > 0 && s.attendance_rate < DEFAULTER_THRESHOLD;
+                const isDefaulter =
+                  s.total_sessions >= MIN_SESSIONS_FOR_DEFAULTER &&
+                  s.attendance_rate < DEFAULTER_THRESHOLD &&
+                  !latestPresentNames.has(normalizeName(s.name));
                 return (
                   <tr key={s.name} className="hover:bg-gray-50/60 dark:hover:bg-gray-800/30 cursor-pointer transition-colors" onClick={() => openStudent(s)}>
                     <td className="px-5 py-3.5">
@@ -320,7 +408,7 @@ const Students: React.FC = () => {
       {/* Student Detail Modal */}
       {selectedStudent && (
         <div className="modal-overlay" onClick={() => setSelectedStudent(null)}>
-          <div className="modal-content max-w-4xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
+          <div className="modal-content max-w-5xl max-h-[90vh] overflow-y-auto" onClick={e => e.stopPropagation()}>
             {/* Modal Header */}
             <div className="sticky top-0 bg-white dark:bg-card-dark border-b border-gray-100 dark:border-gray-800 px-6 py-5 flex items-center justify-between z-10">
               <div className="flex items-center gap-4">
@@ -340,11 +428,11 @@ const Students: React.FC = () => {
             </div>
 
             <div className="p-6 space-y-6">
-              {/* Student Stat Cards */}
+              {/* Primary Stat Cards */}
               <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                 {[
                   { label: 'Attendance', value: selectedStudent.attendance_rate.toFixed(1) + '%', sub: selectedStudent.total_present + '/' + selectedStudent.total_sessions, icon: UserCheck, gradient: rateGradient(selectedStudent.attendance_rate) },
-                  { label: 'Attention Score', value: (selectedStudent.avg_attention_score * 100).toFixed(0) + '%', sub: 'Best: ' + (selectedStudent.best_attention_score * 100).toFixed(0) + '%', icon: Eye, gradient: 'from-blue-400 to-cyan-500' },
+                  { label: 'Attention Score', value: selectedStudent.avg_attention_score > 0 ? (selectedStudent.avg_attention_score * 100).toFixed(0) + '%' : 'N/A', sub: 'Best: ' + (selectedStudent.best_attention_score > 0 ? (selectedStudent.best_attention_score * 100).toFixed(0) + '%' : 'N/A'), icon: Eye, gradient: 'from-blue-400 to-cyan-500' },
                   { label: 'Avg Presence', value: selectedStudent.avg_presence_time.toFixed(1) + 's', sub: 'Per session', icon: Clock, gradient: 'from-indigo-400 to-violet-500' },
                   { label: 'Participation', value: String(selectedStudent.total_participation_events), sub: 'Rate: ' + (selectedStudent.avg_participation_rate * 100).toFixed(0) + '%', icon: Award, gradient: 'from-emerald-400 to-teal-500' },
                 ].map(c => (
@@ -361,15 +449,127 @@ const Students: React.FC = () => {
                 ))}
               </div>
 
-              {/* History Chart */}
+              {/* Biometric Insights Row */}
+              <div className="grid grid-cols-3 gap-3">
+                {[
+                  { label: 'Gaze Stability', value: selectedStudent.avg_gaze_stability > 0 ? (selectedStudent.avg_gaze_stability * 100).toFixed(0) + '%' : 'N/A', icon: Scan, gradient: 'from-sky-400 to-blue-500', desc: 'Eye focus consistency' },
+                  { label: 'Blink Rate', value: selectedStudent.avg_blink_rate > 0 ? selectedStudent.avg_blink_rate.toFixed(1) + '/min' : 'N/A', icon: Eye, gradient: 'from-pink-400 to-rose-500', desc: 'Normal: 15-20/min' },
+                  { label: 'Head Movement', value: selectedStudent.avg_head_movement > 0 ? (selectedStudent.avg_head_movement * 100).toFixed(0) + '%' : 'N/A', icon: Activity, gradient: 'from-amber-400 to-orange-500', desc: 'Restlessness indicator' },
+                ].map(c => (
+                  <div key={c.label} className="rounded-2xl p-4 bg-gradient-to-br from-gray-50 to-gray-100/50 dark:from-gray-800/60 dark:to-gray-800/30 border border-gray-100 dark:border-gray-700/50">
+                    <div className="flex items-center gap-2 mb-2">
+                      <div className={'w-6 h-6 rounded-lg bg-gradient-to-br ' + c.gradient + ' flex items-center justify-center'}>
+                        <c.icon className="w-3 h-3 text-white" />
+                      </div>
+                      <p className="text-[10px] text-gray-500 dark:text-gray-400 uppercase tracking-wider font-semibold">{c.label}</p>
+                    </div>
+                    <p className="text-lg font-extrabold text-gray-900 dark:text-white">{c.value}</p>
+                    <p className="text-[10px] text-gray-400 mt-0.5">{c.desc}</p>
+                  </div>
+                ))}
+              </div>
+
+              {/* Charts Row: Attention States + Radar */}
               {historyLoading ? (
                 <div className="flex justify-center py-10"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary-500" /></div>
               ) : history.length > 0 ? (
                 <>
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                    {/* Attention State Breakdown Donut */}
+                    {(() => {
+                      const totalAttentive = history.reduce((s, h) => s + h.time_attentive, 0);
+                      const totalDistracted = history.reduce((s, h) => s + h.time_distracted, 0);
+                      const totalDrowsy = history.reduce((s, h) => s + h.time_drowsy, 0);
+                      const totalSleeping = history.reduce((s, h) => s + h.time_sleeping, 0);
+                      const total = totalAttentive + totalDistracted + totalDrowsy + totalSleeping;
+                      const stateData = [
+                        { name: 'Attentive', value: totalAttentive, color: '#10B981' },
+                        { name: 'Distracted', value: totalDistracted, color: '#F59E0B' },
+                        { name: 'Drowsy', value: totalDrowsy, color: '#F97316' },
+                        { name: 'Sleeping', value: totalSleeping, color: '#EF4444' },
+                      ].filter(d => d.value > 0);
+                      const attentivePct = total > 0 ? Math.round(totalAttentive / total * 100) : 0;
+                      return (
+                        <div className="glass-card p-5">
+                          <h3 className="section-title mb-4">Attention State Breakdown</h3>
+                          {stateData.length > 0 ? (
+                            <div className="flex items-center gap-4">
+                              <div className="relative flex-shrink-0">
+                                <ResponsiveContainer width={160} height={160}>
+                                  <PieChart>
+                                    <Pie data={stateData} cx="50%" cy="50%" innerRadius={48} outerRadius={72} paddingAngle={3} dataKey="value" strokeWidth={0}>
+                                      {stateData.map((d, i) => <Cell key={i} fill={d.color} />)}
+                                    </Pie>
+                                    <Tooltip formatter={(v: number) => v.toFixed(1) + 's'} />
+                                  </PieChart>
+                                </ResponsiveContainer>
+                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                                  <div className="text-center">
+                                    <p className="text-lg font-extrabold text-gray-900 dark:text-white">{attentivePct}%</p>
+                                    <p className="text-[9px] text-gray-400">Focused</p>
+                                  </div>
+                                </div>
+                              </div>
+                              <div className="flex-1 space-y-2">
+                                {stateData.map(d => {
+                                  const pct = total > 0 ? (d.value / total * 100) : 0;
+                                  return (
+                                    <div key={d.name}>
+                                      <div className="flex items-center justify-between mb-0.5">
+                                        <div className="flex items-center gap-2">
+                                          <div className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: d.color }} />
+                                          <span className="text-xs font-medium text-gray-600 dark:text-gray-400">{d.name}</span>
+                                        </div>
+                                        <span className="text-xs font-bold text-gray-700 dark:text-gray-300">{pct.toFixed(0)}%</span>
+                                      </div>
+                                      <div className="w-full h-1.5 bg-gray-100 dark:bg-gray-800 rounded-full overflow-hidden">
+                                        <div className="h-full rounded-full transition-all" style={{ width: pct + '%', backgroundColor: d.color }} />
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="h-40 flex items-center justify-center text-gray-400 text-sm">No attention data yet — run enhanced analysis</div>
+                          )}
+                        </div>
+                      );
+                    })()}
+
+                    {/* Student Performance Radar */}
+                    <div className="glass-card p-5">
+                      <h3 className="section-title mb-4">Performance Radar</h3>
+                      {(() => {
+                        const radarData = [
+                          { metric: 'Attendance', value: selectedStudent.attendance_rate, fullMark: 100 },
+                          { metric: 'Attention', value: selectedStudent.avg_attention_score * 100, fullMark: 100 },
+                          { metric: 'Gaze', value: selectedStudent.avg_gaze_stability * 100, fullMark: 100 },
+                          { metric: 'Participation', value: selectedStudent.avg_participation_rate * 100, fullMark: 100 },
+                          { metric: 'Presence', value: Math.min(selectedStudent.avg_presence_time * 2, 100), fullMark: 100 },
+                        ];
+                        const hasData = radarData.some(d => d.value > 0);
+                        return hasData ? (
+                          <ResponsiveContainer width="100%" height={180}>
+                            <RadarChart cx="50%" cy="50%" outerRadius={65} data={radarData}>
+                              <PolarGrid stroke="#e2e8f0" />
+                              <PolarAngleAxis dataKey="metric" tick={{ fontSize: 10, fill: '#94a3b8' }} />
+                              <PolarRadiusAxis angle={90} domain={[0, 100]} tick={false} axisLine={false} />
+                              <Radar name="Performance" dataKey="value" stroke="#6C5CE7" fill="#6C5CE7" fillOpacity={0.25} strokeWidth={2} />
+                            </RadarChart>
+                          </ResponsiveContainer>
+                        ) : (
+                          <div className="h-44 flex items-center justify-center text-gray-400 text-sm">No data yet — run enhanced analysis</div>
+                        );
+                      })()}
+                    </div>
+                  </div>
+
+                  {/* Session History Timeline */}
                   <div className="glass-card p-5">
                     <h3 className="section-title mb-4">Session History Timeline</h3>
-                    <ResponsiveContainer width="100%" height={200}>
-                      <AreaChart data={history.map(h => ({ ...h, attention_pct: h.attention_score * 100 }))}>
+                    <ResponsiveContainer width="100%" height={220}>
+                      <AreaChart data={history.map(h => ({ ...h, attention_pct: h.attention_score * 100, gaze_pct: (h.gaze_stability || 0) * 100 }))}>
                         <defs>
                           <linearGradient id="attGradM" x1="0" y1="0" x2="0" y2="1">
                             <stop offset="5%" stopColor="#6C5CE7" stopOpacity={0.3} />
@@ -380,38 +580,54 @@ const Students: React.FC = () => {
                         <XAxis dataKey="session_name" tick={{ fontSize: 9, fill: '#94a3b8' }} axisLine={false} tickLine={false} />
                         <YAxis tick={{ fontSize: 10, fill: '#94a3b8' }} domain={[0, 100]} axisLine={false} tickLine={false} />
                         <Tooltip contentStyle={{ borderRadius: 12, border: 'none', boxShadow: '0 20px 60px rgba(0,0,0,0.1)', fontSize: 12 }} formatter={(v: number) => v.toFixed(1) + '%'} />
-                        <Area type="monotone" dataKey="attentiveness_pct" stroke="#6C5CE7" strokeWidth={2.5} fill="url(#attGradM)" name="Attentiveness" dot={{ r: 3, fill: '#6C5CE7' }} />
-                        <Area type="monotone" dataKey="attention_pct" stroke="#00CEC9" strokeWidth={2} fill="none" name="Attention" dot={{ r: 2, fill: '#00CEC9' }} />
+                        <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 10 }} />
+                        <Area type="monotone" dataKey="attentiveness_pct" stroke="#6C5CE7" strokeWidth={2.5} fill="url(#attGradM)" name="Attentiveness %" dot={{ r: 3, fill: '#6C5CE7' }} />
+                        <Area type="monotone" dataKey="attention_pct" stroke="#00CEC9" strokeWidth={2} fill="none" name="Attention %" dot={{ r: 2, fill: '#00CEC9' }} />
+                        <Area type="monotone" dataKey="gaze_pct" stroke="#F59E0B" strokeWidth={1.5} fill="none" name="Gaze Stability %" dot={{ r: 2, fill: '#F59E0B' }} />
                       </AreaChart>
                     </ResponsiveContainer>
                   </div>
 
-                  {/* History Table */}
+                  {/* Detailed Session History Table */}
                   <div className="overflow-x-auto rounded-2xl border border-gray-100 dark:border-gray-800">
                     <table className="w-full text-xs">
                       <thead>
                         <tr className="bg-gray-50/80 dark:bg-gray-800/50">
-                          <th className="px-4 py-3 table-header">Session</th>
-                          <th className="px-4 py-3 table-header">Date</th>
-                          <th className="px-4 py-3 table-header">Present</th>
-                          <th className="px-4 py-3 table-header">Confidence</th>
-                          <th className="px-4 py-3 table-header">Attention</th>
-                          <th className="px-4 py-3 table-header">Emotion</th>
-                          <th className="px-4 py-3 table-header">Engagement</th>
+                          <th className="px-3 py-3 table-header">Session</th>
+                          <th className="px-3 py-3 table-header">Date</th>
+                          <th className="px-3 py-3 table-header">Present</th>
+                          <th className="px-3 py-3 table-header">Attention</th>
+                          <th className="px-3 py-3 table-header">Gaze</th>
+                          <th className="px-3 py-3 table-header">Blink Rate</th>
+                          <th className="px-3 py-3 table-header">Head Move</th>
+                          <th className="px-3 py-3 table-header">Emotion</th>
+                          <th className="px-3 py-3 table-header">Engagement</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-gray-50 dark:divide-gray-800">
                         {history.map((h, i) => (
                           <tr key={i} className="hover:bg-gray-50/60 dark:hover:bg-gray-800/30 transition-colors">
-                            <td className="px-4 py-3 font-medium text-gray-700 dark:text-gray-300">{h.session_name}</td>
-                            <td className="px-4 py-3 text-gray-500">{h.date ? new Date(h.date).toLocaleDateString() : '--'}</td>
-                            <td className="px-4 py-3">
+                            <td className="px-3 py-3 font-medium text-gray-700 dark:text-gray-300 max-w-[120px] truncate">{h.session_name}</td>
+                            <td className="px-3 py-3 text-gray-500">{h.date ? new Date(h.date).toLocaleDateString() : '--'}</td>
+                            <td className="px-3 py-3">
                               <span className={h.present ? 'status-present' : 'status-absent'}>{h.present ? 'Yes' : 'No'}</span>
                             </td>
-                            <td className="px-4 py-3 text-gray-600 dark:text-gray-400 font-medium">{(h.confidence * 100).toFixed(0)}%</td>
-                            <td className="px-4 py-3 text-gray-600 dark:text-gray-400 font-medium">{h.attentiveness_pct.toFixed(0)}%</td>
-                            <td className="px-4 py-3 text-gray-600 dark:text-gray-400 capitalize">{h.emotion || 'N/A'}</td>
-                            <td className="px-4 py-3 text-gray-600 dark:text-gray-400 capitalize">{h.engagement || 'N/A'}</td>
+                            <td className="px-3 py-3 font-medium">
+                              <span className={h.attentiveness_pct > 0 ? rateColor(h.attentiveness_pct) : 'text-gray-400'}>
+                                {h.attentiveness_pct > 0 ? h.attentiveness_pct.toFixed(0) + '%' : '--'}
+                              </span>
+                            </td>
+                            <td className="px-3 py-3 text-gray-600 dark:text-gray-400">
+                              {h.gaze_stability > 0 ? (h.gaze_stability * 100).toFixed(0) + '%' : '--'}
+                            </td>
+                            <td className="px-3 py-3 text-gray-600 dark:text-gray-400">
+                              {h.blink_rate > 0 ? h.blink_rate.toFixed(1) : '--'}
+                            </td>
+                            <td className="px-3 py-3 text-gray-600 dark:text-gray-400">
+                              {h.head_movement > 0 ? (h.head_movement * 100).toFixed(0) + '%' : '--'}
+                            </td>
+                            <td className="px-3 py-3 text-gray-600 dark:text-gray-400 capitalize">{h.emotion && h.emotion !== 'N/A' && h.emotion !== 'unknown' ? h.emotion : '--'}</td>
+                            <td className="px-3 py-3 text-gray-600 dark:text-gray-400 capitalize">{h.engagement && h.engagement !== 'N/A' && h.engagement !== 'Not Analyzed' ? h.engagement : '--'}</td>
                           </tr>
                         ))}
                       </tbody>

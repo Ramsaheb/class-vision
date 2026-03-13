@@ -11,10 +11,14 @@ from typing import Dict, List, Optional, Any
 import pandas as pd
 from pathlib import Path
 
+# Compute a stable absolute path for the database file
+_DB_DIR = os.path.dirname(os.path.abspath(__file__))  # backend/
+DEFAULT_DB_PATH = os.path.join(_DB_DIR, "attendance_system.db")
+
 class AttendanceDatabase:
     """SQLite database for attendance and attentiveness data"""
     
-    def __init__(self, db_path: str = "attendance_system.db"):
+    def __init__(self, db_path: str = DEFAULT_DB_PATH):
         """Initialize database connection and create tables"""
         self.db_path = db_path
         self.init_database()
@@ -30,12 +34,19 @@ class AttendanceDatabase:
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     name TEXT UNIQUE NOT NULL,
                     gallery_path TEXT,
+                    email TEXT,
                     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
                     last_seen TIMESTAMP,
                     total_sessions INTEGER DEFAULT 0,
                     total_present INTEGER DEFAULT 0
                 )
             """)
+
+            # Add email column if it doesn't exist (migration for existing DBs)
+            try:
+                cursor.execute("ALTER TABLE students ADD COLUMN email TEXT")
+            except sqlite3.OperationalError:
+                pass  # Column already exists
             
             # Sessions table - each video analysis session
             cursor.execute("""
@@ -104,17 +115,22 @@ class AttendanceDatabase:
             """)
             
             conn.commit()
-            print("✅ Database initialized successfully")
+            print("[OK] Database initialized successfully")
     
+    def generate_student_email(self, name: str) -> str:
+        """Generate default college email for a student"""
+        return f"122{name.lower()}2025@sjcem.edu.in"
+
     def add_student(self, name: str, gallery_path: str = None) -> int:
         """Add a new student to the database"""
         with sqlite3.connect(self.db_path) as conn:
             cursor = conn.cursor()
+            email = self.generate_student_email(name)
             try:
                 cursor.execute("""
-                    INSERT INTO students (name, gallery_path) 
-                    VALUES (?, ?)
-                """, (name, gallery_path))
+                    INSERT INTO students (name, gallery_path, email) 
+                    VALUES (?, ?, ?)
+                """, (name, gallery_path, email))
                 conn.commit()
                 return cursor.lastrowid
             except sqlite3.IntegrityError:
@@ -124,6 +140,9 @@ class AttendanceDatabase:
                         UPDATE students SET gallery_path = ? WHERE name = ?
                     """, (gallery_path, name))
                     conn.commit()
+                # Set email if missing
+                cursor.execute("UPDATE students SET email = ? WHERE name = ? AND (email IS NULL OR email = '')", (email, name))
+                conn.commit()
                 # Return existing student ID
                 cursor.execute("SELECT id FROM students WHERE name = ?", (name,))
                 return cursor.fetchone()[0]
@@ -503,6 +522,32 @@ class AttendanceDatabase:
                 return json.loads(result[0])
             return None
     
+    def cleanup_on_startup(self):
+        """Clean up stale data on server startup:
+        - Delete interrupted 'running' sessions that have no records (never finished)
+        - Remove orphan attendance_records whose session was deleted
+        - Recalculate student stats from actual records
+        """
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            # 1. Delete stale running sessions with no records (interrupted runs)
+            cursor.execute("""
+                DELETE FROM sessions
+                WHERE status = 'running'
+                  AND id NOT IN (SELECT DISTINCT session_id FROM attendance_records)
+            """)
+            stale = cursor.rowcount
+            # 2. Delete orphan records whose session no longer exists
+            cursor.execute("""
+                DELETE FROM attendance_records
+                WHERE session_id NOT IN (SELECT id FROM sessions)
+            """)
+            orphans = cursor.rowcount
+            conn.commit()
+        # 3. Recalculate student stats from actual remaining records
+        self.update_student_stats()
+        return stale, orphans
+
     def delete_session(self, session_id: int) -> bool:
         """Delete a session and all its attendance records"""
         with sqlite3.connect(self.db_path) as conn:
@@ -544,10 +589,14 @@ class AttendanceDatabase:
             cursor.execute("""
                 SELECT 
                     st.name,
-                    st.total_sessions,
-                    st.total_present,
-                    st.last_seen,
-                    ROUND(st.total_present * 100.0 / NULLIF(st.total_sessions, 0), 1) as attendance_rate,
+                    COUNT(DISTINCT ar.session_id) as total_sessions,
+                    SUM(CASE WHEN ar.present = 1 THEN 1 ELSE 0 END) as total_present,
+                    MAX(CASE WHEN ar.present = 1 THEN ar.created_at ELSE NULL END) as last_seen,
+                    ROUND(
+                        SUM(CASE WHEN ar.present = 1 THEN 1 ELSE 0 END) * 100.0 /
+                        NULLIF(COUNT(DISTINCT ar.session_id), 0),
+                        1
+                    ) as attendance_rate,
                     ROUND(AVG(CASE WHEN ar.present = 1 THEN ar.avg_attention_score ELSE NULL END), 2) as avg_attention,
                     ROUND(AVG(CASE WHEN ar.present = 1 THEN ar.attentiveness_percentage ELSE NULL END), 1) as avg_attentiveness_pct,
                     ROUND(AVG(CASE WHEN ar.present = 1 THEN ar.total_time_seconds ELSE NULL END), 1) as avg_presence_time,
@@ -716,6 +765,14 @@ class AttendanceDatabase:
                     'head_movement': row[18] or 0
                 })
             return history
+
+    def get_student_emails(self, names: List[str]) -> Dict[str, str]:
+        """Get email addresses for a list of student names"""
+        with sqlite3.connect(self.db_path) as conn:
+            cursor = conn.cursor()
+            placeholders = ','.join('?' for _ in names)
+            cursor.execute(f"SELECT name, email FROM students WHERE name IN ({placeholders})", names)
+            return {row[0]: row[1] for row in cursor.fetchall() if row[1]}
 
 
 # Global database instance

@@ -13,7 +13,7 @@ from datetime import datetime
 
 # Import the original attendance pipeline
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from attendance_pipeline import run_attendance_cached, PROCESS_EVERY_N_FRAMES
+from attendance_pipeline import run_attendance_cached, PROCESS_EVERY_N_FRAMES, AttendanceCache
 
 # Import attentiveness modules
 from attentiveness.manager import AttentivenessManager
@@ -74,6 +74,32 @@ class EnhancedAttendancePipeline:
         self.combined_results = {}
         self.session_start_time = None
         self.seconds_per_processed_frame = 0.0
+        self._attention_detections_by_frame: Dict[int, List[Dict]] = {}
+
+    @staticmethod
+    def _create_robust_video_writer(output_video: str, fps: float, width: int, height: int):
+        """Create a VideoWriter with safe defaults and codec fallback."""
+        safe_fps = float(fps) if fps and fps > 1 else 25.0
+        safe_width = int(width) if width and width > 0 else 640
+        safe_height = int(height) if height and height > 0 else 480
+
+        codec_candidates = ['mp4v', 'XVID', 'MJPG']
+        for codec in codec_candidates:
+            writer = cv2.VideoWriter(
+                output_video,
+                cv2.VideoWriter_fourcc(*codec),
+                safe_fps,
+                (safe_width, safe_height)
+            )
+            if writer.isOpened():
+                print(f"🎥 Enhanced output writer initialized with codec={codec}, fps={safe_fps:.2f}, size={safe_width}x{safe_height}")
+                return writer
+            writer.release()
+
+        raise RuntimeError(
+            f"Failed to create output writer for {output_video}. "
+            f"Tried codecs: {codec_candidates}"
+        )
         
     def process_video(self, 
                      video_path: str, 
@@ -81,7 +107,8 @@ class EnhancedAttendancePipeline:
                      save_results: bool = True,
                      output_csv: str = None,
                      attention_output: str = None,
-                     session_name: str = None) -> Dict:
+                     session_name: str = None,
+                     progress_callback=None) -> Dict:
         """
         Process video for both attendance and attentiveness
         
@@ -115,12 +142,15 @@ class EnhancedAttendancePipeline:
         
         # Process attendance first to get face detections
         print("Processing attendance...")
+        if progress_callback:
+            progress_callback(15, "Enhanced: running attendance phase...")
         attendance_results = run_attendance_cached(
             gallery_dir=self.gallery_dir,
             video_path=video_path,
             output_video=None,  # We'll create our own combined output
             use_cache=True,
-            clear_cache=False
+            clear_cache=False,
+            progress_callback=progress_callback
         )
         
         print(f"Attendance processing complete. Found {len(attendance_results)} students.")
@@ -142,7 +172,10 @@ class EnhancedAttendancePipeline:
         
         # Process video again for attentiveness analysis
         print("Processing attentiveness...")
-        attention_results = self._process_attentiveness(video_path, attendance_results)
+        if progress_callback:
+            progress_callback(55, "Enhanced: running attentiveness phase...")
+        self._attention_detections_by_frame = {}
+        attention_results = self._process_attentiveness(video_path, attendance_results, progress_callback=progress_callback)
         
         # Combine results
         combined_results = self._combine_results(attendance_results, attention_results)
@@ -150,6 +183,8 @@ class EnhancedAttendancePipeline:
         # Create output video with both attendance and attentiveness annotations
         if output_video_path:
             print("Creating annotated output video...")
+            if progress_callback:
+                progress_callback(85, "Enhanced: creating output video...")
             self._create_combined_output_video(
                 video_path, output_video_path, attendance_results, attention_results
             )
@@ -163,28 +198,61 @@ class EnhancedAttendancePipeline:
             self._save_to_database(combined_results)
         
         print("Enhanced processing complete!")
+        if progress_callback:
+            progress_callback(95, "Enhanced: finalizing and saving...")
         return combined_results
     
-    def _process_attentiveness(self, video_path: str, attendance_results: Dict) -> Dict:
-        """Process video for attentiveness analysis using attendance detections"""
+    def _process_attentiveness(self, video_path: str, attendance_results: Dict, progress_callback=None) -> Dict:
+        """Process video for attentiveness analysis using YOLOv8 face detection + recognition"""
         
         cap = cv2.VideoCapture(video_path)
         if not cap.isOpened():
             raise ValueError(f"Could not open video: {video_path}")
+
+        total_frames = int(cap.get(cv2.CAP_PROP_FRAME_COUNT) or 0)
         
         # Compute effective seconds per processed frame
         fps = cap.get(cv2.CAP_PROP_FPS) or 0.0
         if fps and fps > 1e-3:
             self.seconds_per_processed_frame = (1.0 / float(fps)) * float(PROCESS_EVERY_N_FRAMES)
         else:
-            # Fallback to ~30 fps assumption
             self.seconds_per_processed_frame = (1.0 / 30.0) * float(PROCESS_EVERY_N_FRAMES)
+
+        # Build gallery embeddings for face matching during attentiveness
+        gallery_embeddings = self._load_gallery_embeddings()
+        
+        # Load YOLOv8 face model
+        from ultralytics import YOLO
+        yolo_weights_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'yolov8n-face.pt')
+        if not os.path.exists(yolo_weights_path):
+            yolo_weights_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'yolov8n-face.pt')
+        
+        yolo_face = None
+        if os.path.exists(yolo_weights_path):
+            yolo_face = YOLO(yolo_weights_path)
+            print(f"✅ YOLOv8 face model loaded for attentiveness")
+        else:
+            print(f"⚠️ YOLOv8 face weights not found, using MediaPipe fallback")
+
+        # Load face recognition model for matching
+        from facenet_pytorch import InceptionResnetV1
+        import torch
+        resnet = InceptionResnetV1(pretrained='vggface2').eval()
+        
+        from facenet_pytorch import MTCNN
+        mtcnn = MTCNN(keep_all=False, min_face_size=40, device='cpu')
 
         frame_attention_results = {}
         frame_count = 0
+        detected_frames = 0
         
-        # Get attendance tracking data for frame-by-frame analysis
-        attendance_tracks = attendance_results.get('tracking_results', {})
+        # Get list of present students from attendance results
+        attendance_data = attendance_results.get('attendance', {})
+        present_students = set(
+            name for name, data in attendance_data.items()
+            if data.get('presence_percentage', 0) >= 30 or data.get('presence_seconds', 0) >= 10
+        )
+        print(f"🎯 Present students for attentiveness: {present_students}")
         
         try:
             while True:
@@ -194,51 +262,179 @@ class EnhancedAttendancePipeline:
                 
                 frame_count += 1
                 
-                # Skip frames to match attendance processing
                 if frame_count % PROCESS_EVERY_N_FRAMES != 0:
                     continue
                 
-                # Get student detections for this frame from attendance results
-                student_detections = self._get_frame_detections(frame_count, attendance_tracks)
+                # Detect faces in this frame
+                student_detections = self._detect_and_match_faces(
+                    frame, yolo_face, mtcnn, resnet, gallery_embeddings, present_students
+                )
+                if student_detections:
+                    # Keep frame detections for output rendering fallback.
+                    self._attention_detections_by_frame[frame_count] = [
+                        {'id': d.get('id'), 'bbox': d.get('bbox')} for d in student_detections
+                    ]
                 
                 if student_detections:
-                    # Provide timing info to manager for per-minute rates
+                    detected_frames += 1
                     if self.attentiveness_manager is not None:
                         self.attentiveness_manager.seconds_per_processed_frame = float(self.seconds_per_processed_frame)
-                    # Analyze attentiveness for detected students
                     attention_frame_results = self.attentiveness_manager.analyze_classroom(
                         frame, student_detections
                     )
-                    
                     if attention_frame_results:
                         frame_attention_results[frame_count] = attention_frame_results
                 
-                # Progress indicator
-                if frame_count % 300 == 0:  # Every 10 seconds at 30 FPS
-                    print(f"Processed {frame_count} frames for attentiveness...")
+                if frame_count % 300 == 0:
+                    print(f"Attentiveness: processed {frame_count} frames, {detected_frames} with detections...")
+
+                if progress_callback and frame_count % 120 == 0 and total_frames > 0:
+                    # Map attentiveness loop progress to 55-80% range
+                    phase_pct = min(80.0, 55.0 + (frame_count / max(total_frames, 1)) * 25.0)
+                    progress_callback(phase_pct, f"Enhanced attentiveness: frame {frame_count}/{total_frames}")
         
         finally:
             cap.release()
         
+        print(f"✅ Attentiveness analysis complete: {detected_frames} frames with face detections out of {frame_count // PROCESS_EVERY_N_FRAMES} processed")
         return frame_attention_results
     
-    def _get_frame_detections(self, frame_number: int, attendance_tracks: Dict) -> List[Dict]:
-        """Extract student detections for a specific frame from attendance results"""
+    def _load_gallery_embeddings(self) -> Dict[str, np.ndarray]:
+        """Load gallery face embeddings for student matching"""
+        from facenet_pytorch import MTCNN, InceptionResnetV1
+        import torch
+        from PIL import Image
+        
+        mtcnn = MTCNN(keep_all=False, min_face_size=40, device='cpu')
+        resnet = InceptionResnetV1(pretrained='vggface2').eval()
+        
+        embeddings = {}
+        if not os.path.exists(self.gallery_dir):
+            return embeddings
+        
+        for student_name in os.listdir(self.gallery_dir):
+            student_path = os.path.join(self.gallery_dir, student_name)
+            if not os.path.isdir(student_path):
+                continue
+            
+            student_embeddings = []
+            for img_file in os.listdir(student_path):
+                if not img_file.lower().endswith(('.jpg', '.jpeg', '.png', '.bmp')):
+                    continue
+                img_path = os.path.join(student_path, img_file)
+                try:
+                    img = Image.open(img_path).convert('RGB')
+                    face_tensor = mtcnn(img)
+                    if face_tensor is not None:
+                        with torch.no_grad():
+                            emb = resnet(face_tensor.unsqueeze(0)).squeeze().numpy()
+                        student_embeddings.append(emb)
+                except Exception:
+                    continue
+            
+            if student_embeddings:
+                embeddings[student_name] = np.mean(student_embeddings, axis=0)
+        
+        print(f"📸 Loaded gallery embeddings for {len(embeddings)} students")
+        return embeddings
+    
+    def _detect_and_match_faces(self, frame: np.ndarray, yolo_face, mtcnn, resnet,
+                                 gallery_embeddings: Dict[str, np.ndarray],
+                                 present_students: set) -> List[Dict]:
+        """Detect faces in frame and match to known students"""
+        import torch
+        from PIL import Image
         
         detections = []
+        face_boxes = []
         
+        h, w = frame.shape[:2]
+        
+        # Detect faces using YOLOv8
+        if yolo_face is not None:
+            results = yolo_face(frame, conf=0.4, verbose=False)
+            for r in results:
+                for box in r.boxes:
+                    x1, y1, x2, y2 = map(int, box.xyxy[0].tolist())
+                    x1, y1, x2, y2 = max(0, x1), max(0, y1), min(w, x2), min(h, y2)
+                    if (x2 - x1) > 20 and (y2 - y1) > 20:
+                        face_boxes.append([x1, y1, x2, y2])
+        
+        if not face_boxes and not gallery_embeddings:
+            return detections
+        
+        # Match each detected face to a student
+        for bbox in face_boxes:
+            x1, y1, x2, y2 = bbox
+            face_crop = frame[y1:y2, x1:x2]
+            if face_crop.size == 0:
+                continue
+            
+            # Get embedding for this face
+            try:
+                pil_face = Image.fromarray(cv2.cvtColor(face_crop, cv2.COLOR_BGR2RGB))
+                face_tensor = mtcnn(pil_face)
+                if face_tensor is None:
+                    # If MTCNN can't align, use raw crop
+                    face_resized = cv2.resize(face_crop, (160, 160))
+                    face_rgb = cv2.cvtColor(face_resized, cv2.COLOR_BGR2RGB)
+                    face_tensor = torch.FloatTensor(face_rgb).permute(2, 0, 1).unsqueeze(0) / 255.0
+                    face_tensor = face_tensor.squeeze(0)
+                
+                with torch.no_grad():
+                    face_emb = resnet(face_tensor.unsqueeze(0)).squeeze().numpy()
+                
+                # Match against gallery
+                best_name = None
+                best_sim = -1
+                for name, gallery_emb in gallery_embeddings.items():
+                    if name not in present_students:
+                        continue
+                    sim = float(np.dot(face_emb, gallery_emb) / (
+                        np.linalg.norm(face_emb) * np.linalg.norm(gallery_emb) + 1e-8
+                    ))
+                    if sim > best_sim:
+                        best_sim = sim
+                        best_name = name
+                
+                if best_name and best_sim > 0.4:
+                    detections.append({
+                        'id': best_name,
+                        'bbox': [x1, y1, x2, y2]
+                    })
+            except Exception:
+                continue
+        
+        return detections
+
+    def _get_frame_detections(self, frame_number: int, attendance_tracks: Dict) -> List[Dict]:
+        """Extract student detections for a specific frame from tracking results.
+
+        This helper is used while rendering the combined output video. It is
+        intentionally tolerant of missing or partial tracking data.
+        """
+        detections: List[Dict] = []
+
+        if not attendance_tracks:
+            return detections
+
         for student_name, track_data in attendance_tracks.items():
-            # Look for detection in this frame
+            if not isinstance(track_data, dict):
+                continue
             for detection in track_data.get('detections', []):
-                if detection.get('frame') == frame_number:
-                    bbox = detection.get('bbox')
-                    if bbox:
-                        detections.append({
-                            'id': student_name,
-                            'bbox': bbox
-                        })
-                    break
-        
+                if not isinstance(detection, dict):
+                    continue
+                if detection.get('frame') != frame_number:
+                    continue
+
+                bbox = detection.get('bbox')
+                if bbox and isinstance(bbox, (list, tuple)) and len(bbox) == 4:
+                    detections.append({
+                        'id': student_name,
+                        'bbox': [int(v) for v in bbox]
+                    })
+                break
+
         return detections
     
     def _create_attendance_only_summaries(self, attendance_results: Dict) -> Dict:
@@ -282,31 +478,28 @@ class EnhancedAttendancePipeline:
         print(f"🔍 Processing attendance data for {len(attendance_data_source)} detected students")
         
         for student_name, attendance_data in attendance_data_source.items():
-            # Determine if student is present based on confidence and time threshold
+            # Determine if student is present — support both key variants from basic pipeline
+            presence_time = attendance_data.get('presence_seconds', attendance_data.get('total_time_seconds', 0))
+            presence_pct = attendance_data.get('presence_percentage', 0)
+            confidence = attendance_data.get('avg_confidence', 0)
             is_present = (
-                attendance_data.get('avg_confidence', 0) > 0.5 and  # Good confidence
-                attendance_data.get('total_time_seconds', 0) > 5     # Sufficient detection time
+                confidence > 0.5 and  # Good confidence
+                (presence_time > 5 or presence_pct >= 30)  # Sufficient detection time or percentage
             )
             
+            att_entry = {
+                'present': is_present,
+                'total_time': presence_time,
+                'first_seen': attendance_data.get('first_detection_time'),
+                'last_seen': attendance_data.get('last_detection_time'),
+                'confidence': confidence
+            }
+            
             if student_name in summaries:
-                # Update existing entry with actual attendance data
-                summaries[student_name]['attendance'] = {
-                    'present': is_present,
-                    'total_time': attendance_data.get('total_time_seconds', 0),
-                    'first_seen': attendance_data.get('first_detection_time'),
-                    'last_seen': attendance_data.get('last_detection_time'),
-                    'confidence': attendance_data.get('avg_confidence', 0)
-                }
+                summaries[student_name]['attendance'] = att_entry
             else:
-                # Student detected but not in gallery database - add as new entry
                 summaries[student_name] = {
-                    'attendance': {
-                        'present': is_present,
-                        'total_time': attendance_data.get('total_time_seconds', 0),
-                        'first_seen': attendance_data.get('first_detection_time'),
-                        'last_seen': attendance_data.get('last_detection_time'),
-                        'confidence': attendance_data.get('avg_confidence', 0)
-                    },
+                    'attendance': att_entry,
                     'attentiveness': {
                         'analyzed': False,
                         'avg_attention_score': 0,
@@ -401,31 +594,28 @@ class EnhancedAttendancePipeline:
         print(f"🔍 Processing attendance data for {len(attendance_data_source)} detected students")
         
         for student_name, attendance_data in attendance_data_source.items():
-            # Determine if student is present based on confidence and time threshold
+            # Determine if student is present — support both key variants from basic pipeline
+            presence_time = attendance_data.get('presence_seconds', attendance_data.get('total_time_seconds', 0))
+            presence_pct = attendance_data.get('presence_percentage', 0)
+            confidence = attendance_data.get('avg_confidence', 0)
             is_present = (
-                attendance_data.get('avg_confidence', 0) > 0.5 and  # Good confidence
-                attendance_data.get('total_time_seconds', 0) > 5     # Sufficient detection time
+                confidence > 0.5 and  # Good confidence
+                (presence_time > 5 or presence_pct >= 30)  # Sufficient detection time or percentage
             )
             
+            att_entry = {
+                'present': is_present,
+                'total_time': presence_time,
+                'first_seen': attendance_data.get('first_detection_time'),
+                'last_seen': attendance_data.get('last_detection_time'),
+                'confidence': confidence
+            }
+            
             if student_name in summaries:
-                # Update existing entry with actual attendance data
-                summaries[student_name]['attendance'] = {
-                    'present': is_present,
-                    'total_time': attendance_data.get('total_time_seconds', 0),
-                    'first_seen': attendance_data.get('first_detection_time'),
-                    'last_seen': attendance_data.get('last_detection_time'),
-                    'confidence': attendance_data.get('avg_confidence', 0)
-                }
+                summaries[student_name]['attendance'] = att_entry
             else:
-                # Student detected but not in gallery database - add as new entry
                 summaries[student_name] = {
-                    'attendance': {
-                        'present': is_present,
-                        'total_time': attendance_data.get('total_time_seconds', 0),
-                        'first_seen': attendance_data.get('first_detection_time'),
-                        'last_seen': attendance_data.get('last_detection_time'),
-                        'confidence': attendance_data.get('avg_confidence', 0)
-                    },
+                    'attendance': att_entry,
                     'attentiveness': {
                         'analyzed': False,
                         'avg_attention_score': 0,
@@ -488,13 +678,12 @@ class EnhancedAttendancePipeline:
             raise ValueError(f"Could not open video: {input_video}")
         
         # Get video properties
-        fps = int(cap.get(cv2.CAP_PROP_FPS))
+        fps = cap.get(cv2.CAP_PROP_FPS) or 25.0
         width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
         height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
         
-        # Create video writer
-        fourcc = cv2.VideoWriter_fourcc(*'mp4v')
-        out = cv2.VideoWriter(output_video, fourcc, fps, (width, height))
+        # Create video writer with safe FPS/size and codec fallback
+        out = self._create_robust_video_writer(output_video, fps, width, height)
         
         frame_count = 0
         attendance_tracks = attendance_results.get('tracking_results', {})
@@ -509,6 +698,8 @@ class EnhancedAttendancePipeline:
                 
                 # Get detections for this frame
                 student_detections = self._get_frame_detections(frame_count, attendance_tracks)
+                if not student_detections:
+                    student_detections = self._attention_detections_by_frame.get(frame_count, [])
                 
                 # Draw attendance annotations
                 annotated_frame = self._draw_attendance_annotations(frame, student_detections, attendance_results)
@@ -535,7 +726,7 @@ class EnhancedAttendancePipeline:
         """Draw attendance-specific annotations"""
         
         annotated_frame = frame.copy()
-        final_results = attendance_results.get('final_results', {})
+        attendance_map = attendance_results.get('attendance', {})
         
         for detection in student_detections:
             student_name = detection['id']
@@ -543,7 +734,11 @@ class EnhancedAttendancePipeline:
             x1, y1, x2, y2 = bbox
             
             # Get attendance status
-            is_present = final_results.get(student_name, {}).get('present', False)
+            att_data = attendance_map.get(student_name, {})
+            is_present = bool(
+                att_data.get('presence_percentage', 0) >= 30 or
+                att_data.get('presence_seconds', 0) >= 10
+            )
             
             # Choose color based on attendance
             color = (0, 255, 0) if is_present else (0, 0, 255)  # Green if present, Red if absent
@@ -606,29 +801,46 @@ class EnhancedAttendancePipeline:
     
     def _save_to_database(self, combined_results: Dict):
         """Save results to database for persistent storage"""
-        if not self.enable_database or not self.session_id:
+        if not self.enable_database:
+            print("⊘ Database save disabled")
+            return
+        
+        if not self.session_id:
+            print("⚠ No session_id available for database save - skipping")
             return
         
         try:
+            print(f"\n📊 Saving to database (Session ID: {self.session_id})...")
+            
+            # Check what we're saving
+            student_summaries = combined_results.get('student_summaries', {})
+            print(f"  → Student summaries: {len(student_summaries)} students")
+            
             # Calculate session duration
             session_duration = None
             if self.session_start_time:
                 session_duration = (datetime.now() - self.session_start_time).total_seconds()
             
             # Save session results
+            print(f"  → Calling save_session_results()...")
             db.save_session_results(self.session_id, combined_results)
             
             # Complete the session
+            print(f"  → Calling complete_session()...")
             db.complete_session(self.session_id, session_duration)
             
             # Cache dashboard analytics
             dashboard_data = db.get_dashboard_data()
             db.cache_analytics('dashboard_data', dashboard_data)
             
-            print(f"✅ Results saved to database (Session ID: {self.session_id})")
+            print(f"✅ Data successfully saved for session {self.session_id}")
+            print(f"  → {len(student_summaries)} attendance records saved")
+            print(f"  → Session duration: {session_duration:.1f}s" if session_duration else "")
             
         except Exception as e:
+            import traceback
             print(f"❌ Failed to save to database: {e}")
+            traceback.print_exc()
     
     def _save_attendance_csv(self, student_summaries: Dict, output_path: str):
         """Save attendance results in CSV format with detailed attentiveness data"""
