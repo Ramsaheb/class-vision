@@ -21,7 +21,7 @@ DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 DEFAULT_GALLERY_DIR = os.path.join(PROJECT_ROOT, 'SI1')
 DEFAULT_VIDEO_PATH = os.path.join(PROJECT_ROOT, 'input1.mp4')
 DEFAULT_OUTPUT_VIDEO = os.path.join(PROJECT_ROOT, 'attendance_output.mp4')
-PROCESS_EVERY_N_FRAMES = max(1, int(os.getenv('PROCESS_EVERY_N_FRAMES', '5')))
+PROCESS_EVERY_N_FRAMES = max(1, int(os.getenv('PROCESS_EVERY_N_FRAMES', '1')))
 
 
 def _create_robust_video_writer(output_video: str, fps: float, width: int, height: int):
@@ -54,10 +54,11 @@ USE_MTCNN = True
 USE_MEDIAPIPE = True
 YOLO_FACE_WEIGHTS = os.path.join(PROJECT_ROOT, 'yolov8n-face.pt')
 
-# Relaxed thresholds
-YOLO_CONF = 0.4
+# Detection thresholds (configurable for classroom density)
+YOLO_CONF = float(os.getenv('YOLO_CONF', '0.30'))
 MTCNN_THRESHOLD = 0.6
 MEDIAPIPE_CONF = 0.5
+NMS_IOU_THRESHOLD = float(os.getenv('NMS_IOU_THRESHOLD', '0.45'))
 
 # Validation (relaxed)
 MIN_FACE_SIZE = 20
@@ -74,20 +75,20 @@ MAX_EYE_DISTANCE = 200
 EYE_MOUTH_RATIO_MIN = 0.8
 EYE_MOUTH_RATIO_MAX = 4.0
 
-# Recognition thresholds (strict for unknown detection)
-MIN_RECOGNITION_SIM = 0.65  # Increased from 0.45
-UNKNOWN_THRESHOLD = 0.55    # Increased from 0.35
-SIM_MARGIN = 0.15           # Increased from 0.05
-STABILITY_FRAMES = 5        # Increased from 3 (need more frames to confirm)
-CONFIDENCE_BOOST_FRAMES = 8 # Increased from 6
+# Recognition thresholds (strict defaults for higher identity precision)
+MIN_RECOGNITION_SIM = float(os.getenv('MIN_RECOGNITION_SIM', '0.65'))
+UNKNOWN_THRESHOLD = float(os.getenv('UNKNOWN_THRESHOLD', '0.55'))
+SIM_MARGIN = float(os.getenv('SIM_MARGIN', '0.15'))
+STABILITY_FRAMES = int(os.getenv('STABILITY_FRAMES', '5'))
+CONFIDENCE_BOOST_FRAMES = int(os.getenv('CONFIDENCE_BOOST_FRAMES', '8'))
 
 # Tracking
 MATCHING_IOU_WEIGHT = 0.4
 MATCHING_APPEARANCE_WEIGHT = 0.6
 MAX_TRACK_AGE_FRAMES = 30
-# Changed from absolute time to percentage-based attendance
-ATTENDANCE_PERCENTAGE_THRESHOLD = 30  # 30% of video duration
-PRESENCE_SECONDS_THRESHOLD = 12  # Keep for backward compatibility
+# Attendance thresholds (env-configurable for different classroom/video conditions)
+ATTENDANCE_PERCENTAGE_THRESHOLD = float(os.getenv('ATTENDANCE_PERCENTAGE_THRESHOLD', '15'))
+PRESENCE_SECONDS_THRESHOLD = float(os.getenv('PRESENCE_SECONDS_THRESHOLD', '5'))
 
 # Quality (disabled for rejection)
 BLUR_THRESHOLD = 0
@@ -355,7 +356,7 @@ def iou(boxA, boxB):
     denom = max(1, boxAArea + boxBArea - interArea)
     return interArea / denom
 
-def non_max_suppression(detections, iou_threshold=0.3):
+def non_max_suppression(detections, iou_threshold=NMS_IOU_THRESHOLD):
     if len(detections) == 0:
         return []
     detections = sorted(detections, key=lambda x: x['confidence'], reverse=True)
@@ -417,7 +418,7 @@ def multi_detector_fusion(frame, mtcnn, yolo_face, mp_face_detection):
                         all_detections.append({'box':[x1,y1,x2,y2],'confidence':float(detection.score[0]),'source':'MediaPipe','landmarks':None})
         except Exception as e:
             print(f"MediaPipe detection error: {e}")
-    return non_max_suppression(all_detections, iou_threshold=0.3)
+    return non_max_suppression(all_detections, iou_threshold=NMS_IOU_THRESHOLD)
 
 def advanced_crop_and_align(img_bgr, box, margin=0.3, target_size=160):
     x1, y1, x2, y2 = box
@@ -608,6 +609,12 @@ def run_attendance_cached(
     cache = AttendanceCache()
 
     print(f"⚡ Frame sampling: processing 1 of every {PROCESS_EVERY_N_FRAMES} frame(s)")
+    print(f"👁️ Detection settings: yolo_conf={YOLO_CONF:.2f}, nms_iou={NMS_IOU_THRESHOLD:.2f}")
+    print(
+        "🎯 Recognition thresholds: "
+        f"min_sim={MIN_RECOGNITION_SIM:.2f}, unknown={UNKNOWN_THRESHOLD:.2f}, "
+        f"margin={SIM_MARGIN:.2f}, stability={STABILITY_FRAMES}"
+    )
     
     if clear_cache:
         cache.clear_cache()

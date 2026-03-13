@@ -13,7 +13,13 @@ from datetime import datetime
 
 # Import the original attendance pipeline
 sys.path.append(os.path.dirname(os.path.abspath(__file__)))
-from attendance_pipeline import run_attendance_cached, PROCESS_EVERY_N_FRAMES, AttendanceCache
+from attendance_pipeline import (
+    run_attendance_cached,
+    PROCESS_EVERY_N_FRAMES,
+    AttendanceCache,
+    ATTENDANCE_PERCENTAGE_THRESHOLD,
+    PRESENCE_SECONDS_THRESHOLD,
+)
 
 # Import attentiveness modules
 from attentiveness.manager import AttentivenessManager
@@ -250,7 +256,10 @@ class EnhancedAttendancePipeline:
         attendance_data = attendance_results.get('attendance', {})
         present_students = set(
             name for name, data in attendance_data.items()
-            if data.get('presence_percentage', 0) >= 30 or data.get('presence_seconds', 0) >= 10
+            if (
+                data.get('presence_percentage', 0) >= ATTENDANCE_PERCENTAGE_THRESHOLD
+                or data.get('presence_seconds', 0) >= PRESENCE_SECONDS_THRESHOLD
+            )
         )
         print(f"🎯 Present students for attentiveness: {present_students}")
         
@@ -388,8 +397,6 @@ class EnhancedAttendancePipeline:
                 best_name = None
                 best_sim = -1
                 for name, gallery_emb in gallery_embeddings.items():
-                    if name not in present_students:
-                        continue
                     sim = float(np.dot(face_emb, gallery_emb) / (
                         np.linalg.norm(face_emb) * np.linalg.norm(gallery_emb) + 1e-8
                     ))
@@ -484,7 +491,10 @@ class EnhancedAttendancePipeline:
             confidence = attendance_data.get('avg_confidence', 0)
             is_present = (
                 confidence > 0.5 and  # Good confidence
-                (presence_time > 5 or presence_pct >= 30)  # Sufficient detection time or percentage
+                (
+                    presence_time >= PRESENCE_SECONDS_THRESHOLD
+                    or presence_pct >= ATTENDANCE_PERCENTAGE_THRESHOLD
+                )  # Sufficient detection time or percentage
             )
             
             att_entry = {
@@ -600,7 +610,10 @@ class EnhancedAttendancePipeline:
             confidence = attendance_data.get('avg_confidence', 0)
             is_present = (
                 confidence > 0.5 and  # Good confidence
-                (presence_time > 5 or presence_pct >= 30)  # Sufficient detection time or percentage
+                (
+                    presence_time >= PRESENCE_SECONDS_THRESHOLD
+                    or presence_pct >= ATTENDANCE_PERCENTAGE_THRESHOLD
+                )  # Sufficient detection time or percentage
             )
             
             att_entry = {
@@ -736,8 +749,8 @@ class EnhancedAttendancePipeline:
             # Get attendance status
             att_data = attendance_map.get(student_name, {})
             is_present = bool(
-                att_data.get('presence_percentage', 0) >= 30 or
-                att_data.get('presence_seconds', 0) >= 10
+                att_data.get('presence_percentage', 0) >= ATTENDANCE_PERCENTAGE_THRESHOLD or
+                att_data.get('presence_seconds', 0) >= PRESENCE_SECONDS_THRESHOLD
             )
             
             # Choose color based on attendance

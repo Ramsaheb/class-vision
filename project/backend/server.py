@@ -110,8 +110,8 @@ class AppState:
 
 app_state = AppState()
 
-# Auto-start flag - keep disabled to avoid hidden startup runs during debugging.
-AUTO_START_PROCESSING = False
+# Auto-start processing on server startup. Can be disabled with AUTO_START_PROCESSING=0.
+AUTO_START_PROCESSING = os.getenv("AUTO_START_PROCESSING", "1").strip().lower() in ("1", "true", "yes", "on")
 
 @app.on_event("startup")
 async def startup_event():
@@ -138,7 +138,8 @@ async def startup_event():
             print(f"\u26a0\ufe0f Data export failed: {e}")
 
     # Restore last_result from disk so LiveAnalytics works immediately
-    if app_state.last_result is None:
+    # Skip restore when auto-start is enabled to force a fresh processing session on boot.
+    if app_state.last_result is None and not AUTO_START_PROCESSING:
         for fname in ("enhanced_last_result.json", "last_result.json"):
             fpath = os.path.join(PROJECT_ROOT, fname)
             if os.path.isfile(fpath):
@@ -152,6 +153,10 @@ async def startup_event():
 
     if AUTO_START_PROCESSING:
         print("🚀 Server started! Auto-starting attendance processing...")
+
+        # Force a fresh run status for this boot; previous runs remain in database history.
+        app_state.last_result = None
+        app_state.processing_status = {"is_processing": True, "progress": 0, "message": "Auto-starting fresh session..."}
         
         # Wait a moment for server to fully initialize
         await asyncio.sleep(2)
@@ -169,7 +174,7 @@ async def startup_event():
         print(f"🎬 Video: {default_request.video_path}")
         print("🔄 Starting automatic processing...")
         
-        # Use the basic pipeline (which was working fine)
+        # Start a fresh processing run (enhanced pipeline is used automatically if available)
         asyncio.create_task(process_attendance_async(default_request))
 
 @app.on_event("shutdown")
@@ -1011,6 +1016,23 @@ def video_stream():
     def generate_frames():
         # Check if we have processed output video
         video_path = DEFAULT_OUTPUT_VIDEO
+
+        # Never read the output file while a new run is writing it.
+        # This avoids decoding partially written/corrupted frames.
+        if app_state.processing_status.get("is_processing", False):
+            import numpy as np
+            while app_state.processing_status.get("is_processing", False):
+                progress = app_state.processing_status.get('progress', 0)
+                dummy_frame = np.zeros((480, 640, 3), dtype=np.uint8)
+                cv2.putText(dummy_frame, "Processing Video...", (120, 200),
+                           cv2.FONT_HERSHEY_SIMPLEX, 1, (255, 255, 255), 2)
+                cv2.putText(dummy_frame, f"{progress}% Complete", (150, 250),
+                           cv2.FONT_HERSHEY_SIMPLEX, 0.8, (255, 255, 255), 2)
+                ret, buffer = cv2.imencode('.jpg', dummy_frame)
+                frame = buffer.tobytes()
+                yield (b'--frame\r\n'
+                       b'Content-Type: image/jpeg\r\n\r\n' + frame + b'\r\n')
+                time.sleep(0.5)
         
         if not os.path.exists(video_path):
             # Check if processing is happening
@@ -1049,14 +1071,33 @@ def video_stream():
                     return
             
         cap = cv2.VideoCapture(video_path)
+        consecutive_read_failures = 0
         
         try:
             while True:
                 ret, frame = cap.read()
                 if not ret:
-                    # Loop the processed video continuously
-                    cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
-                    continue
+                    consecutive_read_failures += 1
+                    if consecutive_read_failures == 1:
+                        # One rewind attempt is enough for normal loop playback.
+                        cap.set(cv2.CAP_PROP_POS_FRAMES, 0)
+                        continue
+
+                    # Stop instead of infinite retry on a corrupted/unreadable video.
+                    import numpy as np
+                    dummy_frame = np.zeros((480, 640, 3), dtype=np.uint8)
+                    cv2.putText(dummy_frame, "Video stream unavailable", (90, 210),
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.9, (255, 255, 255), 2)
+                    cv2.putText(dummy_frame, "Please rerun processing", (130, 250),
+                               cv2.FONT_HERSHEY_SIMPLEX, 0.8, (200, 200, 200), 2)
+                    ok, buffer = cv2.imencode('.jpg', dummy_frame)
+                    if ok:
+                        frame_bytes = buffer.tobytes()
+                        yield (b'--frame\r\n'
+                               b'Content-Type: image/jpeg\r\n\r\n' + frame_bytes + b'\r\n')
+                    break
+                else:
+                    consecutive_read_failures = 0
                     
                 # Resize frame for web display
                 height, width = frame.shape[:2]

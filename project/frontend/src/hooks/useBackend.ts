@@ -39,6 +39,25 @@ function loadFromCache<T = unknown>(endpoint: string): T | null {
   } catch { return null; }
 }
 
+function isEmptyCachedPayload(key: string, payload: unknown): boolean {
+  if (!payload || typeof payload !== 'object') return false;
+
+  const obj = payload as Record<string, unknown>;
+
+  if (key === '/sessions') {
+    const sessions = obj.sessions;
+    return Array.isArray(sessions) && sessions.length === 0;
+  }
+
+  if (key === '/student-insights') {
+    const data = obj.data as Record<string, unknown> | undefined;
+    const sessions = data?.sessions;
+    return Array.isArray(sessions) && sessions.length === 0;
+  }
+
+  return false;
+}
+
 // ─── Static Snapshot Fallback ─────────────────────────────────
 // Maps API endpoint keys to static JSON files exported by the backend.
 const SNAPSHOT_MAP: Record<string, string> = {
@@ -110,10 +129,17 @@ export async function cachedFetch<T = unknown>(
   
   // Tier 2: Try localStorage cache (fastest fallback)
   const cached = loadFromCache<T>(key);
-  if (cached) return { data: cached, offline: true };
+  if (cached && !isEmptyCachedPayload(key, cached)) {
+    return { data: cached, offline: true };
+  }
   
   // Tier 3: Try static snapshot file (exported after each session runs)
   const snapshot = await loadFromSnapshot<T>(key);
+  if (snapshot) return { data: snapshot, offline: true };
+
+  // Last fallback: return even empty cached payload if no snapshot exists.
+  if (cached) return { data: cached, offline: true };
+
   return { data: snapshot, offline: true };
 }
 
