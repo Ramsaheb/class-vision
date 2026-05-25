@@ -9,7 +9,7 @@ An intelligent classroom attendance and student engagement monitoring system usi
 This system automates attendance tracking and monitors student attentiveness in real-time using video feeds from classroom cameras. It combines face recognition for identification with behavioral analysis for engagement scoring.
 
 **Core Capabilities:**
-- Automated face detection and recognition (85%+ accuracy)
+- Automated face detection and recognition (95%+ accuracy)
 - Real-time attentiveness monitoring (4 states: Attentive, Distracted, Drowsy, Sleeping)
 - Live dashboard with WebSocket updates
 - Comprehensive analytics and CSV/PDF reports
