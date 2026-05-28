@@ -19,7 +19,7 @@ import mediapipe as mp
 PROJECT_ROOT = os.path.abspath(os.path.join(os.path.dirname(__file__), '..'))
 DEVICE = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
 DEFAULT_GALLERY_DIR = os.path.join(PROJECT_ROOT, 'SI1')
-DEFAULT_VIDEO_PATH = os.path.join(PROJECT_ROOT, 'input1.mp4')
+DEFAULT_VIDEO_PATH = os.path.join(PROJECT_ROOT, 'input2.mp4')
 DEFAULT_OUTPUT_VIDEO = os.path.join(PROJECT_ROOT, 'attendance_output.mp4')
 PROCESS_EVERY_N_FRAMES = max(1, int(os.getenv('PROCESS_EVERY_N_FRAMES', '1')))
 
