@@ -1,0 +1,288 @@
+{
+  "data": {
+    "statistics": {
+      "total_sessions": 5,
+      "total_students": 29,
+      "avg_attention": 0,
+      "total_present": 27,
+      "total_absent": 31
+    },
+    "recent_sessions": [
+      {
+        "id": 10,
+        "name": "Enhanced_Session_20260319_195412",
+        "start_time": "2026-03-19 14:24:12",
+        "present": 4,
+        "total": 30,
+        "attendance_rate": 13.3
+      },
+      {
+        "id": 8,
+        "name": "Enhanced_Session_20260313_193421",
+        "start_time": "2026-03-13 14:04:21",
+        "present": 6,
+        "total": 7,
+        "attendance_rate": 85.7
+      },
+      {
+        "id": 7,
+        "name": "Enhanced_Session_20260313_185257",
+        "start_time": "2026-03-13 13:22:57",
+        "present": 6,
+        "total": 7,
+        "attendance_rate": 85.7
+      },
+      {
+        "id": 5,
+        "name": "Enhanced_Session_20260313_184222",
+        "start_time": "2026-03-13 13:12:22",
+        "present": 6,
+        "total": 7,
+        "attendance_rate": 85.7
+      },
+      {
+        "id": 4,
+        "name": "Enhanced_Session_20260313_183804",
+        "start_time": "2026-03-13 13:08:04",
+        "present": 5,
+        "total": 7,
+        "attendance_rate": 71.4
+      }
+    ],
+    "students": [
+      {
+        "name": "Chandan",
+        "total_sessions": 1,
+        "total_present": 1,
+        "attendance_rate": 100.0,
+        "avg_attention": 0,
+        "last_seen": "2026-03-19 17:06:09"
+      },
+      {
+        "name": "Ishan",
+        "total_sessions": 1,
+        "total_present": 1,
+        "attendance_rate": 100.0,
+        "avg_attention": 0,
+        "last_seen": "2026-03-19 17:06:09"
+      },
+      {
+        "name": "Sagar",
+        "total_sessions": 1,
+        "total_present": 1,
+        "attendance_rate": 100.0,
+        "avg_attention": 0,
+        "last_seen": "2026-03-19 17:06:09"
+      },
+      {
+        "name": "Harsh",
+        "total_sessions": 5,
+        "total_present": 4,
+        "attendance_rate": 80.0,
+        "avg_attention": 0,
+        "last_seen": "2026-03-19 17:06:09"
+      },
+      {
+        "name": "Harshal",
+        "total_sessions": 5,
+        "total_present": 4,
+        "attendance_rate": 80.0,
+        "avg_attention": 0,
+        "last_seen": "2026-03-13 14:20:46"
+      },
+      {
+        "name": "Harshit",
+        "total_sessions": 5,
+        "total_present": 4,
+        "attendance_rate": 80.0,
+        "avg_attention": 0,
+        "last_seen": "2026-03-13 14:20:46"
+      },
+      {
+        "name": "Krish",
+        "total_sessions": 5,
+        "total_present": 4,
+        "attendance_rate": 80.0,
+        "avg_attention": 0,
+        "last_seen": "2026-03-13 14:20:46"
+      },
+      {
+        "name": "Rajendra",
+        "total_sessions": 5,
+        "total_present": 4,
+        "attendance_rate": 80.0,
+        "avg_attention": 0,
+        "last_seen": "2026-03-13 14:20:46"
+      },
+      {
+        "name": "Vishal",
+        "total_sessions": 5,
+        "total_present": 4,
+        "attendance_rate": 80.0,
+        "avg_attention": 0,
+        "last_seen": "2026-03-13 14:20:46"
+      },
+      {
+        "name": "Anish",
+        "total_sessions": 1,
+        "total_present": 0,
+        "attendance_rate": 0,
+        "avg_attention": 0,
+        "last_seen": null
+      },
+      {
+        "name": "Anway",
+        "total_sessions": 1,
+        "total_present": 0,
+        "attendance_rate": 0,
+        "avg_attention": 0,
+        "last_seen": null
+      },
+      {
+        "name": "CR",
+        "total_sessions": 1,
+        "total_present": 0,
+        "attendance_rate": 0,
+        "avg_attention": 0,
+        "last_seen": null
+      },
+      {
+        "name": "David",
+        "total_sessions": 1,
+        "total_present": 0,
+        "attendance_rate": 0,
+        "avg_attention": 0,
+        "last_seen": null
+      },
+      {
+        "name": "Ghungru",
+        "total_sessions": 1,
+        "total_present": 0,
+        "attendance_rate": 0,
+        "avg_attention": 0,
+        "last_seen": null
+      },
+      {
+        "name": "Himanshu",
+        "total_sessions": 1,
+        "total_present": 0,
+        "attendance_rate": 0,
+        "avg_attention": 0,
+        "last_seen": null
+      },
+      {
+        "name": "Krutika",
+        "total_sessions": 1,
+        "total_present": 0,
+        "attendance_rate": 0,
+        "avg_attention": 0,
+        "last_seen": null
+      },
+      {
+        "name": "Kunal",
+        "total_sessions": 1,
+        "total_present": 0,
+        "attendance_rate": 0,
+        "avg_attention": 0,
+        "last_seen": null
+      },
+      {
+        "name": "Prem",
+        "total_sessions": 1,
+        "total_present": 0,
+        "attendance_rate": 0,
+        "avg_attention": 0,
+        "last_seen": null
+      },
+      {
+        "name": "Purva",
+        "total_sessions": 1,
+        "total_present": 0,
+        "attendance_rate": 0,
+        "avg_attention": 0,
+        "last_seen": null
+      },
+      {
+        "name": "Purvi",
+        "total_sessions": 1,
+        "total_present": 0,
+        "attendance_rate": 0,
+        "avg_attention": 0,
+        "last_seen": null
+      },
+      {
+        "name": "Ramsaheb",
+        "total_sessions": 5,
+        "total_present": 0,
+        "attendance_rate": 0,
+        "avg_attention": 0,
+        "last_seen": null
+      },
+      {
+        "name": "Rohan",
+        "total_sessions": 1,
+        "total_present": 0,
+        "attendance_rate": 0,
+        "avg_attention": 0,
+        "last_seen": null
+      },
+      {
+        "name": "Rohit",
+        "total_sessions": 1,
+        "total_present": 0,
+        "attendance_rate": 0,
+        "avg_attention": 0,
+        "last_seen": null
+      },
+      {
+        "name": "Saish",
+        "total_sessions": 1,
+        "total_present": 0,
+        "attendance_rate": 0,
+        "avg_attention": 0,
+        "last_seen": null
+      },
+      {
+        "name": "Sheri",
+        "total_sessions": 1,
+        "total_present": 0,
+        "attendance_rate": 0,
+        "avg_attention": 0,
+        "last_seen": null
+      },
+      {
+        "name": "Shreyas",
+        "total_sessions": 1,
+        "total_present": 0,
+        "attendance_rate": 0,
+        "avg_attention": 0,
+        "last_seen": null
+      },
+      {
+        "name": "Vishaka",
+        "total_sessions": 1,
+        "total_present": 0,
+        "attendance_rate": 0,
+        "avg_attention": 0,
+        "last_seen": null
+      },
+      {
+        "name": "Vivek",
+        "total_sessions": 1,
+        "total_present": 0,
+        "attendance_rate": 0,
+        "avg_attention": 0,
+        "last_seen": null
+      },
+      {
+        "name": "smit",
+        "total_sessions": 1,
+        "total_present": 0,
+        "attendance_rate": 0,
+        "avg_attention": 0,
+        "last_seen": null
+      }
+    ]
+  },
+  "cached": false
+}
