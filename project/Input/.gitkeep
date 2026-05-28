@@ -1,0 +1,3 @@
+# Keep directory in git repository while ignoring its contents
+!index.mp4
+!.gitkeep

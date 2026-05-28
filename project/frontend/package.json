@@ -1,7 +1,14 @@
 {
-  "name": "vite-react-typescript-starter",
+  "name": "class-vision-dashboard",
+  "version": "1.0.0",
+  "description": "Interactive analytics dashboard for the Class Vision AI-powered classroom attendance and engagement tracking system",
+  "author": "Ramsaheb Prasad <ramsaheb.prasad.dev@gmail.com>",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/Ramsaheb/class-vision.git"
+  },
   "private": true,
-  "version": "0.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite",

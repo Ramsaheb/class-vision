@@ -104,3 +104,8 @@ project/frontend/public/data/*.json
 .DS_Store
 Thumbs.db
 desktop.ini
+
+# ─── Benchmark Generated Files ─────────────────────────
+benchmark/synthetic_gallery/
+benchmark/synthetic_video.mp4
+benchmark/benchmark_results.json

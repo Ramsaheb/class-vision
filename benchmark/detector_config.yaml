@@ -1,0 +1,47 @@
+# ─── Class Vision: Benchmark Detector Configurations ───
+
+# 🎥 Video Input Settings
+video:
+  default_path: "Input/synthetic_classroom.mp4"
+  fps: 30
+  resolution: [1920, 1080]
+  codec: "mp4v"
+
+# 🎯 Face Detection Layer
+face_detection:
+  primary_detector: "YOLOv8-face"  # Options: YOLOv8-face, MTCNN, MediaPipe
+  yolo:
+    model_weights: "yolov8n-face.pt"
+    confidence_threshold: 0.30
+    nms_iou_threshold: 0.45
+  mtcnn:
+    min_face_size: 20
+    thresholds: [0.6, 0.7, 0.7]
+    factor: 0.709
+  mediapipe:
+    model_selection: 1  # 0 for short-range (< 2m), 1 for full-range (< 5m)
+    min_detection_confidence: 0.50
+
+# 👤 Face Recognition Layer
+face_recognition:
+  model: "FaceNet-InceptionResnetV1"
+  embedding_dimension: 512
+  distance_metric: "cosine"  # Options: cosine, euclidean
+  similarity_threshold: 0.65
+  unknown_threshold: 0.55
+  similarity_margin: 0.15
+  recognition_stability_frames: 5
+
+# 📊 Attention Analysis Settings
+attention_tracking:
+  gaze_estimation:
+    eye_openness_threshold: 0.22
+    gaze_stability_window: 10
+  pose_estimation:
+    pitch_threshold: [-15.0, 15.0]  # Degrees allowed before "not focused"
+    yaw_threshold: [-20.0, 20.0]    # Degrees allowed before "not focused"
+    roll_threshold: [-15.0, 15.0]
+  emotion_detection:
+    confidence_threshold: 0.45
+  gesture_recognition:
+    hand_raise_threshold: 0.75
