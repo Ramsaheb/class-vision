@@ -1,399 +1,890 @@
 <p align="center">
-  <img src="https://img.shields.io/badge/python-3.8+-3776AB?style=for-the-badge&logo=python&logoColor=white" alt="Python 3.8+"/>
-  <img src="https://img.shields.io/badge/node-18+-339933?style=for-the-badge&logo=node.js&logoColor=white" alt="Node 18+"/>
-  <img src="https://img.shields.io/badge/react-18-61DAFB?style=for-the-badge&logo=react&logoColor=black" alt="React 18"/>
-  <img src="https://img.shields.io/badge/FastAPI-009688?style=for-the-badge&logo=fastapi&logoColor=white" alt="FastAPI"/>
-  <img src="https://img.shields.io/badge/license-MIT-green?style=for-the-badge" alt="MIT License"/>
+
+# 🎓 Class Vision — CORIS
+
+### Classroom Observation & Recognition Intelligence System
+
+![Python](https://img.shields.io/badge/Python-3.8+-3776AB?style=for-the-badge\&logo=python\&logoColor=white)
+![Node](https://img.shields.io/badge/Node.js-18+-339933?style=for-the-badge\&logo=node.js\&logoColor=white)
+![React](https://img.shields.io/badge/React-18-61DAFB?style=for-the-badge\&logo=react\&logoColor=black)
+![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=for-the-badge\&logo=fastapi\&logoColor=white)
+![License](https://img.shields.io/badge/License-MIT-green?style=for-the-badge)
+
+### Privacy-Preserving Multimodal Visual Analytics for Classroom Attendance and Engagement Assessment
+
+*A research-oriented framework for automated classroom attendance verification and student engagement analysis using edge-based multimodal visual computing.*
+
 </p>
 
-<h1 align="center">🎓 Class Vision — CORIS</h1>
+---
 
-<p align="center">
-  <b>Classroom Observation & Recognition Intelligence System</b><br/>
-  AI-powered face recognition and student engagement tracking for smart classrooms.
-</p>
+# 📖 Overview
+
+Class Vision (CORIS) is a research framework for classroom attendance verification and engagement assessment using multimodal visual analytics.
+
+The framework integrates:
+
+* Face detection
+* Face recognition
+* Behavioural cue extraction
+* Student engagement estimation
+* Edge-oriented processing
+* Real-time dashboard analytics
+
+to provide classroom insights while reducing dependence on cloud infrastructure.
+
+Unlike traditional attendance systems, Class Vision combines identity verification with behavioural observations to support educational analytics under privacy-aware deployment settings.
 
 ---
 
-## Overview
+# 🔬 Research Status
 
-Class Vision automates attendance tracking and monitors student attentiveness in real-time using video feeds from classroom cameras. It combines face recognition for identification with behavioral analysis for engagement scoring.
+This repository accompanies the research work:
 
-**Core Capabilities:**
-- 🎯 Automated face detection and recognition (95%+ accuracy)
-- 📊 Real-time attentiveness monitoring (4 states: Attentive, Distracted, Drowsy, Sleeping)
-- 📡 Live dashboard with WebSocket updates
-- 📋 Comprehensive analytics and CSV/PDF reports
-- 💾 Persistent SQLite storage across sessions
+> **Privacy-Preserving Multimodal Visual Analytics for Classroom Attendance and Engagement Assessment**
 
----
+The present implementation represents a **pilot research prototype** evaluated under controlled classroom conditions.
 
-## Screenshots
+Current evaluation focuses on demonstrating the feasibility of combining attendance verification and behavioural analysis in a unified edge-processing framework.
 
-<!-- Add screenshots of your dashboard here -->
-<!-- ![Dashboard](docs/screenshots/dashboard.png) -->
-<!-- ![Live Analytics](docs/screenshots/live-analytics.png) -->
+Future work includes:
 
-> 📸 *Screenshots coming soon — run the project locally to see the dashboard in action!*
+* Larger datasets,
+* Multi-classroom evaluation,
+* Demographic diversity,
+* Temporal learning models,
+* Longitudinal classroom studies.
 
 ---
 
-## System Architecture
+# ✨ Features
 
-```mermaid
-flowchart TD
-    subgraph INPUT["Input"]
-        CAM["📹 Camera/Video"]
-    end
+## Attendance Verification
 
-    subgraph PROCESSING["Edge Processing"]
-        EDGE["🖥️ Local Machine"]
-    end
+* Multi-detector face localisation
+* Face embedding generation
+* Identity verification
+* Unknown face handling
+* Attendance persistence
 
-    subgraph AI["AI Processing Pipeline"]
-        direction TB
-        FRAME["Frame Extraction"]
-        
-        subgraph DETECT["Detection Layer"]
-            YOLO["YOLOv8-face"]
-            MTCNN["MTCNN"]
-            MP["MediaPipe"]
-        end
-        
-        subgraph RECOG["Recognition Layer"]
-            FACENET["FaceNet Embeddings"]
-            MATCH["Gallery Matching"]
-        end
-        
-        subgraph ATTENTION["Attention Analysis"]
-            POSE["Pose Estimation"]
-            GAZE["Gaze Tracking"]
-            EMOTION["Emotion Detection"]
-            GESTURE["Gesture Recognition"]
-        end
-        
-        CLASSIFIER["ML Classifier"]
-    end
+---
 
-    subgraph SCORING["Scoring"]
-        CALC["Score Calculator"]
-        ATT_STATUS["Attendance Status"]
-        ENG_SCORE["Engagement Score"]
-    end
+## Student Engagement Analysis
 
-    subgraph SERVER["Backend"]
-        API["FastAPI Server"]
-        WS["WebSocket"]
-    end
+Four engagement states:
 
-    subgraph STORAGE["Storage"]
-        DB[("SQLite")]
-    end
+* 🟢 Attentive
+* 🟡 Distracted
+* 🟠 Drowsy
+* 🔴 Sleeping
 
-    subgraph UI["Frontend"]
-        DASH["React Dashboard"]
-    end
+Behavioural cues include:
 
-    subgraph OUTPUT["Output"]
-        REPORT["Reports (CSV/PDF)"]
-    end
+* Head pose
+* Eye gaze
+* Facial landmarks
+* Eye openness
+* Mouth activity
+* Hand gestures
 
-    CAM --> EDGE --> FRAME
-    FRAME --> DETECT
-    YOLO & MTCNN & MP --> RECOG
-    FACENET --> MATCH
-    FRAME --> ATTENTION
-    POSE & GAZE & EMOTION & GESTURE --> CLASSIFIER
-    MATCH --> CALC
-    CLASSIFIER --> CALC
-    CALC --> ATT_STATUS & ENG_SCORE
-    ATT_STATUS & ENG_SCORE --> API
-    API <--> DB
-    API --> WS --> DASH
-    DB --> REPORT
-```
+---
 
-### Data Flow Summary
+## Backend
 
-```
-Camera → Edge Device → AI Pipeline → Backend Server → Database
-                                          ↓
-                            Frontend Dashboard ← WebSocket
-                                          ↓
-                                   Report Generation
+* FastAPI REST API
+* WebSocket communication
+* SQLite persistence
+* Session history
+* CSV export
+
+---
+
+## Frontend
+
+* React 18
+* TypeScript
+* Vite
+* TailwindCSS
+* Recharts
+* Live dashboard
+
+---
+
+# 🔒 Privacy Notice
+
+Class Vision processes facial and behavioural information.
+
+Any real-world deployment should:
+
+* Obtain informed consent.
+* Follow applicable privacy regulations.
+* Protect stored data.
+* Implement access controls.
+* Define retention policies.
+* Consider ethical implications of behavioural monitoring.
+
+The current architecture improves privacy through local processing but does not eliminate all privacy risks.
+
+Original classroom recordings are not publicly distributed.
+
+---
+
+# 🏗 System Architecture
+
+```text
+Camera
+   │
+   ▼
+Edge Device
+   │
+   ▼
+AI Processing Pipeline
+   │
+   ├── Face Detection
+   ├── Face Recognition
+   ├── Behaviour Analysis
+   └── Engagement Estimation
+   │
+   ▼
+FastAPI Backend
+   │
+   ├── SQLite
+   ├── REST API
+   └── WebSocket
+   │
+   ▼
+React Dashboard
+   │
+   ▼
+Analytics & Reports
 ```
 
 ---
 
-## Project Structure
+# 🔄 Data Flow
+
+```text
+Camera
+   │
+   ▼
+Frame Acquisition
+   │
+   ▼
+Face Detection
+   │
+   ▼
+Identity Verification
+   │
+   ▼
+Behaviour Analysis
+   │
+   ▼
+Engagement Estimation
+   │
+   ▼
+FastAPI Backend
+   │
+   ▼
+SQLite Storage
+   │
+   ▼
+WebSocket
+   │
+   ▼
+React Dashboard
+   │
+   ▼
+CSV Analytics
+```
+
+---
+
+# 📸 Screenshots
+
+Sample dashboard outputs and privacy-preserving examples will be included in the repository.
+
+Original classroom recordings are withheld due to participant privacy considerations.
 
 ```
+Dashboard
+──────────────
+Attendance
+Engagement
+Live Analytics
+Session Summary
+Defaulter Reports
+```
+
+---
+
+# 🎯 Core Components
+
+| Module                | Purpose                          |
+| --------------------- | -------------------------------- |
+| Face Detection        | Locate faces                     |
+| Face Recognition      | Verify identities                |
+| Behaviour Analysis    | Extract visual cues              |
+| Engagement Estimation | Determine engagement state       |
+| Backend               | Process and store data           |
+| Dashboard             | Display analytics                |
+| Reporting             | Export attendance and statistics |
+
+---
+
+# 📚 Associated Publication
+
+This repository accompanies the manuscript:
+
+**Privacy-Preserving Multimodal Visual Analytics for Classroom Attendance and Engagement Assessment**
+
+The repository provides:
+
+* Source code
+* Configuration files
+* Model information
+* Sample anonymised examples
+* Reproducibility materials
+* Hardware specifications
+* Inference instructions
+
+to support the associated research.
+
+# 📂 Project Structure
+
+```text
 class-vision/
-├── README.md                            # ← You are here
+│
+├── README.md
 ├── LICENSE
 ├── CONTRIBUTING.md
 ├── .gitignore
 │
-└── project/
-    ├── backend/
-    │   ├── server.py                    # FastAPI + WebSocket server
-    │   ├── attendance_pipeline.py       # Face detection & recognition
-    │   ├── enhanced_attendance_pipeline.py  # Full pipeline with attentiveness
-    │   ├── database.py                  # SQLite persistence layer
-    │   ├── prepare_new_students_dataset.py  # Gallery preparation utility
-    │   ├── requirements.txt
-    │   ├── .env.example                 # Environment variable reference
-    │   └── attentiveness/
-    │       ├── manager.py               # Coordinates all attention modules
-    │       ├── pose_estimator.py        # Head pose (yaw/pitch/roll)
-    │       ├── gaze_tracker.py          # Eye gaze direction
-    │       ├── emotion_detector.py      # Facial emotion analysis
-    │       ├── gesture_detector.py      # Hand gesture recognition
-    │       └── classifier.py            # ML attention state classifier
-    │
-    ├── frontend/
-    │   ├── index.html
-    │   ├── package.json
-    │   ├── vite.config.ts
-    │   ├── tailwind.config.js
-    │   └── src/
-    │       ├── App.tsx                  # Router setup
-    │       ├── main.tsx                 # Entry point
-    │       ├── index.css                # Global styles
-    │       ├── components/
-    │       │   └── Layout.tsx           # App shell & navigation
-    │       ├── contexts/
-    │       │   └── ThemeContext.tsx      # Dark/light mode
-    │       ├── hooks/
-    │       │   └── useBackend.ts        # API & WebSocket hooks
-    │       └── pages/
-    │           ├── Dashboard.tsx        # Main analytics view
-    │           ├── LiveAnalytics.tsx    # Real-time monitoring
-    │           ├── Students.tsx         # Student profiles & data
-    │           ├── Sessions.tsx         # Session history
-    │           ├── Defaulters.tsx       # Attendance defaulters
-    │           └── Help.tsx             # Help & documentation
-    │
-    ├── Input/                           # Place video files here
-    ├── Output/                          # Processed output videos
-    ├── SI1/                             # Student photo gallery
-    │   └── [StudentName]/
-    │       └── photo.jpg
-    │
-    ├── student_detection_model.ipynb    # Training notebook
-    └── DATABASE_README.md               # Database schema docs
+├── project/
+│   │
+│   ├── backend/
+│   │   ├── server.py
+│   │   ├── attendance_pipeline.py
+│   │   ├── enhanced_attendance_pipeline.py
+│   │   ├── database.py
+│   │   ├── prepare_new_students_dataset.py
+│   │   ├── requirements.txt
+│   │   ├── .env.example
+│   │   │
+│   │   └── attentiveness/
+│   │       ├── manager.py
+│   │       ├── pose_estimator.py
+│   │       ├── gaze_tracker.py
+│   │       ├── emotion_detector.py
+│   │       ├── gesture_detector.py
+│   │       └── classifier.py
+│   │
+│   ├── frontend/
+│   │   ├── src/
+│   │   ├── package.json
+│   │   ├── vite.config.ts
+│   │   └── tailwind.config.js
+│   │
+│   ├── Input/
+│   ├── Output/
+│   ├── SI1/
+│   ├── DATABASE_README.md
+│   └── student_detection_model.ipynb
+│
+└── docs/
 ```
 
 ---
 
-## Technology Stack
+# ⚙ Technology Stack
 
-### Backend
-| Component | Technology | Purpose |
-|-----------|------------|---------|
-| Web Framework | FastAPI | REST API + WebSocket |
-| Face Detection | YOLOv8, MTCNN, MediaPipe | Multi-detector fusion |
-| Face Recognition | FaceNet (InceptionResnetV1) | 512-dim embeddings |
-| Pose Analysis | MediaPipe + Gradients | Head orientation |
-| ML Framework | PyTorch | Deep learning inference |
-| Database | SQLite | Session & attendance storage |
+## Backend
 
-### Frontend
-| Component | Technology | Purpose |
-|-----------|------------|---------|
-| Framework | React 18 + TypeScript | UI components |
-| Build Tool | Vite | Fast development |
-| Styling | Tailwind CSS | Utility-first CSS |
-| Charts | Recharts | Data visualization |
-| Routing | React Router | SPA navigation |
+| Component          | Technology               |
+| ------------------ | ------------------------ |
+| API Framework      | FastAPI                  |
+| Face Detection     | YOLOv8, MTCNN, MediaPipe |
+| Face Recognition   | FaceNet                  |
+| Deep Learning      | PyTorch                  |
+| Behaviour Analysis | MediaPipe                |
+| Database           | SQLite                   |
+| Communication      | WebSocket                |
 
 ---
 
-## Quick Start
+## Frontend
 
-### Prerequisites
+| Component  | Technology   |
+| ---------- | ------------ |
+| Framework  | React 18     |
+| Language   | TypeScript   |
+| Build Tool | Vite         |
+| Styling    | TailwindCSS  |
+| Charts     | Recharts     |
+| Routing    | React Router |
 
-- Python 3.8+
-- Node.js 18+
-- 8 GB RAM (16 GB recommended)
-- GPU with CUDA (optional, improves speed)
+---
 
-### 1. Clone the Repository
+# 💻 System Requirements
+
+## Minimum
+
+* Python 3.8+
+* Node.js 18+
+* 8 GB RAM
+* Dual-core CPU
+
+---
+
+## Recommended
+
+* Python 3.10+
+* Node.js 20+
+* 16 GB RAM
+* CUDA GPU
+* SSD Storage
+
+---
+
+# 🚀 Quick Start
+
+## 1. Clone Repository
 
 ```bash
-git clone https://github.com/Ramsaheb/class-vision.git
+git clone https://github.com/YOUR_USERNAME/class-vision.git
+
 cd class-vision
 ```
 
-### 2. Backend Setup
+---
+
+# 🐍 Backend Installation
+
+Move into backend:
 
 ```bash
 cd project/backend
-pip install -r requirements.txt
+```
 
-# (Optional) Copy and configure environment variables
+Install dependencies:
+
+```bash
+pip install -r requirements.txt
+```
+
+Create environment file:
+
+```bash
 cp .env.example .env
 ```
 
-### 3. Download Model Weights
+---
 
-Download `yolov8n-face.pt` and place it in `project/`:
+# 🤖 Model Preparation
 
-```bash
-# The model will be auto-downloaded on first run, or you can place it manually
+The framework uses pretrained models.
+
+Required models include:
+
+* YOLOv8 Face
+* FaceNet
+* MediaPipe
+
+Models may be:
+
+* downloaded automatically,
+* or placed manually inside the project.
+
+Example:
+
+```text
+project/
+
+yolov8n-face.pt
 ```
 
-### 4. Prepare Student Gallery
+---
 
-Create a folder for each student inside `project/SI1/` with 3–5 photos:
+# 👨‍🎓 Student Gallery
 
+Create one folder per enrolled student.
+
+Example:
+
+```text
+SI1/
+
+Alice/
+photo1.jpg
+photo2.jpg
+
+Bob/
+photo1.jpg
+photo2.jpg
 ```
-project/SI1/
-├── Alice/
-│   ├── photo1.jpg
-│   └── photo2.jpg
-├── Bob/
-│   └── photo1.jpg
-└── ...
-```
 
-### 5. Frontend Setup
+Multiple images per student are recommended.
+
+---
+
+# 🌐 Frontend Installation
+
+Move into frontend:
 
 ```bash
 cd project/frontend
+```
+
+Install dependencies:
+
+```bash
 npm install
 ```
 
-### 6. Run the System
+---
+
+# ▶ Running the Framework
+
+## Terminal 1
+
+Backend:
 
 ```bash
-# Terminal 1 — Backend
 cd project/backend
-uvicorn server:app --reload --port 8000
 
-# Terminal 2 — Frontend
+uvicorn server:app --reload --port 8000
+```
+
+---
+
+## Terminal 2
+
+Frontend:
+
+```bash
 cd project/frontend
+
 npm run dev
 ```
 
-### Access Points
+---
 
-| Service | URL |
-|---------|-----|
-| Dashboard | http://localhost:5173 |
-| API Docs (Swagger) | http://localhost:8000/docs |
+# 🌍 Access Points
+
+| Service      | Address                            |
+| ------------ | ---------------------------------- |
+| Dashboard    | http://localhost:5173              |
+| API Docs     | http://localhost:8000/docs         |
+| OpenAPI JSON | http://localhost:8000/openapi.json |
 
 ---
 
-## API Reference
+# 🔌 API Overview
 
-| Endpoint | Method | Description |
-|----------|--------|-------------|
-| `/process` | POST | Start video processing |
-| `/last-result` | GET | Retrieve latest results |
-| `/gallery-info` | GET | Get student gallery stats |
-| `/health` | GET | Server health check |
-| `/dashboard-data` | GET | Dashboard statistics |
-| `/students` | GET | All students with performance |
-| `/student/{name}` | GET | Individual student profile |
-| `/sessions` | GET | Recent session history |
-| `/session/{id}` | GET | Detailed session info |
-| `/ws` | WebSocket | Real-time updates stream |
-
----
-
-## Output Metrics
-
-### CSV Export (30+ fields)
-
-The system exports comprehensive attendance reports including **all students** (present and absent):
-
-| Category | Metrics |
-|----------|---------|
-| **Identity** | Student Name, Status (Present/Absent), Present (1/0) |
-| **Attendance** | Presence Duration (s), Presence %, Recognition Confidence, Detection Sources |
-| **Attention** | Attention Score (%), Attentiveness %, Attention State, Peak/Lowest Attention |
-| **Engagement** | Engagement Level, Time Attentive/Distracted/Drowsy/Sleeping (s) |
-| **Behavioral** | Gaze Score, Gaze Stability, Head Pose (Yaw/Pitch), Head Movement |
-| **Emotion** | Dominant Emotion, Emotion Confidence |
-| **Participation** | Participation Score, Events, Hand Gestures Detected |
-| **Physiological** | Blink Rate, Eye Openness |
-| **Session** | Session Name, Session Timestamp |
-
-### Engagement Levels
-
-| Level | Attentiveness % |
-|-------|-----------------|
-| Highly Engaged | ≥ 80% |
-| Well Engaged | 60–79% |
-| Moderately Engaged | 40–59% |
-| Poorly Engaged | 20–39% |
-| Disengaged | < 20% |
+| Endpoint        | Method    |
+| --------------- | --------- |
+| /process        | POST      |
+| /last-result    | GET       |
+| /gallery-info   | GET       |
+| /health         | GET       |
+| /dashboard-data | GET       |
+| /students       | GET       |
+| /student/{name} | GET       |
+| /sessions       | GET       |
+| /session/{id}   | GET       |
+| /ws             | WebSocket |
 
 ---
 
-## Configuration
+# 📊 Dashboard
 
-Key parameters in `project/backend/attendance_pipeline.py`:
+The React dashboard provides:
+
+* Attendance overview
+* Student profiles
+* Live analytics
+* Session history
+* Defaulter tracking
+* Engagement statistics
+* CSV export
+
+---
+
+# 📁 Outputs
+
+The framework generates:
+
+## Attendance
+
+* Present
+* Absent
+* Unknown
+
+---
+
+## Engagement
+
+* Attentive
+* Distracted
+* Drowsy
+* Sleeping
+
+---
+
+## Analytics
+
+* Recognition confidence
+* Attention score
+* Presence duration
+* Participation score
+* Blink statistics
+* Gaze information
+* Session summary
+
+---
+
+# 📈 Engagement Levels
+
+| Level          | Score  |
+| -------------- | ------ |
+| Highly Engaged | ≥80%   |
+| Well Engaged   | 60–79% |
+| Moderate       | 40–59% |
+| Poor           | 20–39% |
+| Disengaged     | <20%   |
+
+---
+
+
+
+# ⚙ Configuration
+
+Typical configurable parameters include:
 
 ```python
-# Recognition
-MIN_RECOGNITION_SIM = 0.65    # Similarity threshold for match
-UNKNOWN_THRESHOLD = 0.55      # Below this = unknown person
-STABILITY_FRAMES = 5          # Frames to confirm identity
+Recognition Threshold
 
-# Detection
-YOLO_CONF = 0.4               # YOLO confidence threshold
-MTCNN_THRESHOLD = 0.6         # MTCNN detection threshold
-PROCESS_EVERY_N_FRAMES = 1    # Frame processing frequency
+Unknown Threshold
+
+YOLO Confidence
+
+MTCNN Threshold
+
+Frame Interval
+
+Attention Boundaries
 ```
 
-### Environment Variables
-
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `AUTO_START_PROCESSING` | `1` | Auto-start video processing on server boot |
-| `SMTP_HOST` | — | SMTP server for defaulter email alerts |
-| `SMTP_PORT` | — | SMTP port |
-| `SMTP_USER` | — | SMTP username |
-| `SMTP_PASSWORD` | — | SMTP password |
+Configuration values can be adjusted according to deployment requirements.
 
 ---
 
-## Troubleshooting
+# 🔧 Environment Variables
 
-| Issue | Solution |
-|-------|----------|
-| CUDA out of memory | Set `DEVICE = 'cpu'` or reduce batch size |
-| Model not found | Verify `yolov8n-face.pt` is in `project/` |
-| WebSocket disconnects | Check backend is running on port 8000 |
-| Low recognition accuracy | Add more photos per student (3–5 angles) |
-| Slow processing | Enable GPU or increase `PROCESS_EVERY_N_FRAMES` |
-
----
-
-## Contributing
-
-Contributions are welcome! Please read [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
+| Variable              | Purpose           |
+| --------------------- | ----------------- |
+| AUTO_START_PROCESSING | Automatic startup |
+| SMTP_HOST             | Mail server       |
+| SMTP_PORT             | Mail port         |
+| SMTP_USER             | Username          |
+| SMTP_PASSWORD         | Password          |
 
 ---
 
-## License
+# 📦 Hardware Evaluation
 
-This project is licensed under the MIT License — see the [LICENSE](LICENSE) file for details.
+Typical evaluation setup:
+
+| Component | Example       |
+| --------- | ------------- |
+| CPU       | Intel/AMD     |
+| RAM       | 16 GB         |
+| Storage   | SSD           |
+| OS        | Windows/Linux |
+| GPU       | Optional      |
+
+GPU acceleration may improve throughput but is not mandatory.
 
 ---
 
-## Acknowledgements
+# 📤 Export Formats
 
-- [YOLOv8](https://github.com/ultralytics/ultralytics) — Real-time object detection
-- [FaceNet-PyTorch](https://github.com/timesler/facenet-pytorch) — Face recognition embeddings
-- [MediaPipe](https://github.com/google/mediapipe) — Face mesh and hand tracking
-- [FastAPI](https://fastapi.tiangolo.com/) — High-performance Python API framework
-- [React](https://react.dev/) + [Vite](https://vitejs.dev/) — Modern frontend tooling
+The framework supports:
+
+* CSV reports
+* Attendance summaries
+* Session analytics
+* Student statistics
+
+---
+
+# 🔄 Typical Workflow
+
+```text
+Create Gallery
+      │
+      ▼
+Start Backend
+      │
+      ▼
+Start Frontend
+      │
+      ▼
+Capture Video
+      │
+      ▼
+Detect Faces
+      │
+      ▼
+Recognise Students
+      │
+      ▼
+Estimate Engagement
+      │
+      ▼
+Store Results
+      │
+      ▼
+Display Dashboard
+      │
+      ▼
+Export Reports
+```
+
+# 🔬 Reproducibility
+
+This repository accompanies the research manuscript:
+
+> **Privacy-Preserving Multimodal Visual Analytics for Classroom Attendance and Engagement Assessment**
+
+To support reproducibility, the repository provides:
+
+* Source code
+* Configuration files
+* Model information
+* Detector thresholds
+* Hardware specifications
+* Inference instructions
+* Sample anonymised examples
+* Example outputs
+
+Original classroom recordings are not publicly distributed due to participant privacy considerations.
+
+---
+
+# 🔒 Privacy and Ethical Considerations
+
+Class Vision processes facial and behavioural information.
+
+Any real-world deployment should:
+
+* Obtain informed consent.
+* Follow applicable privacy regulations.
+* Protect stored data.
+* Implement access controls.
+* Define retention policies.
+* Limit access to authorised users.
+* Consider ethical implications of behavioural monitoring.
+
+The current architecture improves privacy through local processing but does not eliminate all privacy risks.
+
+This framework is intended primarily for research and educational purposes.
+
+---
+
+# ⚠ Limitations
+
+The present implementation represents a pilot research prototype.
+
+Current limitations include:
+
+* Limited dataset size.
+* Controlled classroom conditions.
+* Static engagement thresholds.
+* Limited demographic diversity.
+* CPU-oriented evaluation.
+* Behavioural heuristics.
+
+Results should not be interpreted as validation for large-scale educational deployment.
+
+Future work includes:
+
+* Larger datasets.
+* Diverse classroom environments.
+* Temporal learning models.
+* Personalised engagement estimation.
+* Multi-camera systems.
+
+---
+
+# 🛠 Troubleshooting
+
+| Problem                  | Possible Solution             |
+| ------------------------ | ----------------------------- |
+| Model not found          | Download required weights     |
+| Low recognition accuracy | Add additional student images |
+| Slow processing          | Enable GPU acceleration       |
+| WebSocket disconnect     | Verify backend server         |
+| Database errors          | Check SQLite permissions      |
+| API unavailable          | Verify FastAPI service        |
+
+---
+
+# 📋 Best Practices
+
+For best results:
+
+* Use multiple images per student.
+* Ensure adequate classroom lighting.
+* Position the camera to minimise occlusions.
+* Keep the student gallery updated.
+* Review recognition thresholds for new environments.
+
+---
+
+# 🤝 Contributing
+
+Contributions are welcome.
+
+If you would like to contribute:
+
+1. Fork the repository.
+2. Create a feature branch.
+3. Commit your changes.
+4. Submit a pull request.
+
+Please read:
+
+```
+CONTRIBUTING.md
+```
+
+before contributing.
+
+Bug reports and feature suggestions are appreciated.
+
+---
+
+# 📖 Associated Publication
+
+This repository accompanies the research manuscript:
+
+**Privacy-Preserving Multimodal Visual Analytics for Classroom Attendance and Engagement Assessment.**
+
+The repository provides:
+
+* Source code
+* Reproducibility materials
+* Configuration files
+* Sample anonymised examples
+* Hardware specifications
+* Documentation
+
+associated with the study.
+
+---
+
+# 🚀 Future Work
+
+Planned improvements include:
+
+## Dataset
+
+* Larger participant groups.
+* Multiple classroom environments.
+* Diverse demographic representation.
+
+---
+
+## Visual Analytics
+
+* Temporal engagement modelling.
+* Multi-camera fusion.
+* Improved behavioural cue integration.
+
+---
+
+## Deployment
+
+* Cross-platform support.
+* Edge-device optimisation.
+* Cloud-edge hybrid architectures.
+
+---
+
+## Educational Analytics
+
+* Longitudinal attendance trends.
+* Student participation modelling.
+* Classroom interaction analytics.
+
+---
+
+# 📜 License
+
+This project is licensed under the MIT License.
+
+See:
+
+```
+LICENSE
+```
+
+for details.
+
+---
+
+# 🙏 Acknowledgements
+
+This work builds upon several excellent open-source projects:
+
+* YOLOv8
+* FaceNet-PyTorch
+* MediaPipe
+* FastAPI
+* React
+* Vite
+* PyTorch
+* SQLite
+* WebSocket technologies
+
+We thank the open-source community for making research and educational development accessible.
+
+---
+
+# 💡 Research Disclaimer
+
+Class Vision is a research-oriented framework developed to investigate privacy-preserving multimodal visual analytics for classroom environments.
+
+The present implementation represents a pilot evaluation under controlled conditions and should not be interpreted as a production-ready educational monitoring system.
+
+Further validation across larger and more diverse classroom settings remains future work.
+
+---
+
+
+---
+
+# ⭐ Support the Project
+
+If you find this work useful for research or education:
+
+* ⭐ Star the repository
+* 🍴 Fork the project
+* 📝 Cite the associated publication
+* 🤝 Contribute improvements
 
 ---
 
 <p align="center">
-  <i>Built with ❤️ for smarter classrooms</i>
+
+### 🎓 Class Vision — CORIS
+
+**Privacy-Preserving Multimodal Visual Analytics for Classroom Attendance and Engagement Assessment**
+
+*A research-oriented framework for classroom attendance verification and student engagement analysis.*
+
+**Built with Python • FastAPI • React • PyTorch • MediaPipe**
+
+**MIT Licensed**
+
 </p>
